@@ -6,11 +6,11 @@ export default function LandingPage() {
     return (
         <>
             <h1 className="flex gap-2 items-center">
-                <TrophyIcon size={50} className="text-lime-400" />
-                Top Squad
+                <TrophyIcon size={50} className="text-yellow-600" />
+                Top-Squad
             </h1>
             <p>
-                Does your squad have what it takes?
+                Does your team have what it takes?
             </p>
             <div className="flex gap-2 items-center">
             <Button asChild>

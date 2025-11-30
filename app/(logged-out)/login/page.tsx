@@ -9,15 +9,16 @@ import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import {z} from "zod";
+import { useAuth, useSignIn } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const formSchema = z.object({
     email: z.email({ message: "Please enter a valid email addresss"}),
-    password: z.string()
+    password: z.string(),
 });
 
-const handleSubmit = () => {
-    console.log("Login validation passed")
-};
 
 export default function LoginPage() {
     const form = useForm<z.infer<typeof formSchema>>({
@@ -28,9 +29,58 @@ export default function LoginPage() {
         }
     });
 
+    const {signIn, setActive, isLoaded} = useSignIn();
+    const {isSignedIn} = useAuth();
+    const router = useRouter();
+    const [formError, setFormError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (isSignedIn) {
+        router.replace("/dashboard");
+        }
+    }, [isSignedIn, router]);
+
+    const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+        setFormError(null);
+
+        if (!isLoaded) return;
+
+        const { email, password } = values;
+
+        try {
+            const result = await signIn.create({
+            identifier: email,
+            password,
+        });
+
+        if (result.status === "complete") {
+            await setActive({ session: result.createdSessionId });
+            router.push("/dashboard");
+        } else {
+            setFormError(`Sign-in status: ${result.status}`);
+        }
+        } catch (err: any) {
+            console.error("Sign-in error:", err);
+
+            const code = err?.errors?.[0]?.code;
+            const message =
+            err?.errors?.[0]?.longMessage ||
+            err?.errors?.[0]?.message ||
+            "Invalid email or password";
+
+            if (code === "session_exists" || message === "You're already signed in.") {
+            router.push("/dashboard");
+            return;
+            }
+
+        setFormError(message);
+    }
+};
+
+
     return (
         <>
-        <TrophyIcon size={50} className="text-lime-400" />
+        <TrophyIcon size={50} className="text-yellow-600" />
         <Card className="w-full max-w-sm">
             <CardHeader>
                 <CardTitle>
@@ -64,7 +114,7 @@ export default function LoginPage() {
                                     Password
                                 </FormLabel>
                                 <FormControl>
-                                    <Input placeholder="password" type="password" {...field} /> 
+                                    <PasswordInput placeholder="********" {...field} /> 
                                 </FormControl>
                                 <FormDescription>
                                     This is the password you used to create your Top-Squad account
