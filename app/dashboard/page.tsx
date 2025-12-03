@@ -16,15 +16,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-10 space-y-4">
-      <h1 className="text-3xl font-semibold">
-        Welcome,{" "}
-        {user?.firstName ||
-          user?.username ||
-          user?.emailAddresses?.[0]?.emailAddress ||
-          "TopSquad user"}
-      </h1>
-
+    <div>
       <p className="text-muted-foreground">
         This is your simple dashboard. You&apos;re signed in with Clerk.
       </p>

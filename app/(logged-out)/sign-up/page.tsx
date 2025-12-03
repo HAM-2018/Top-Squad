@@ -135,7 +135,7 @@ export default function SignupPage() {
 
     return (
         <>
-        <TrophyIcon size={50} className="text-yellow-600" />
+        <TrophyIcon size={50} className="text-yellow-500" />
         <Card className="w-full max-w-sm">
             <CardHeader>
                 <CardTitle>
