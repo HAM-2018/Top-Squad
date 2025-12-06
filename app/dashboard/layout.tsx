@@ -1,18 +1,22 @@
 "use client";
 
-import MainMenu from "@/main-menu/main-menu";
-import { RedirectToSignIn, useUser } from "@clerk/nextjs"
+import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation";
+import MainMenu from "./components/main-menu";
+import { useEffect } from "react";
 
 export default function DashboardLayout({children}: {children: React.ReactNode}) {
     const {user, isLoaded, isSignedIn} = useUser();
     const router = useRouter();
 
-    if (!isLoaded) return null;
-
-    if (!isSignedIn) {
-        router.push("/login");
+    useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push("/login");
     }
+  }, [isLoaded, isSignedIn, router]);
+
+  // while loading or redirecting, render nothing (or a spinner)
+  if (!isLoaded || !isSignedIn) return null;
 
     return (
         <div className="grid grid-cols-[250px_1fr] h-screen">
