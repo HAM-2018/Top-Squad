@@ -52,5 +52,6 @@ export default function MainMenu() {
                 <LightDarkToggle className="ml-auto" />
             </footer>
         </nav>
+
     )
 }

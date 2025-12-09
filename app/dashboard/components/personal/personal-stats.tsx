@@ -94,7 +94,7 @@ export default function IndividualChallenges() {
                     <span>Current Challenge times</span>   
                 </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pl-0">
                 <IndividualChallengeScores />
             </CardContent>
         </Card>
