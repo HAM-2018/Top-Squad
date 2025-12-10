@@ -1,4 +1,3 @@
-// app/teams/page.tsx
 
 import { db } from "@/db";
 import { teamsTable, teamMembersTable, usersTable } from "@/db/schema";
