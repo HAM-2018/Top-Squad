@@ -3,7 +3,6 @@
 import { eq } from "drizzle-orm";
 import { teamMembersTable, teamsTable, usersTable } from "../schema";
 import { db } from "..";
-import z from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { type CreateTeam, createTeamSchema } from "@/validation/createTeamSchema";
 

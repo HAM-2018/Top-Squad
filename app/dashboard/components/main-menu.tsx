@@ -3,7 +3,6 @@ import MenuItem from "./menu-item";
 import MenuTitle from "./menu-title";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { LightDarkToggle } from "@/components/ui/light-dark-toggle";
 
 export default function MainMenu() {
