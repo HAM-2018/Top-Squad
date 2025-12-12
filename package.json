@@ -44,7 +44,7 @@
     "@types/pg": "^8.15.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "baseline-browser-mapping": "^2.9.4",
+    "baseline-browser-mapping": "^2.9.6",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",

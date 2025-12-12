@@ -12,6 +12,13 @@ export const challengeMetrics = pgEnum("challenge_metric", [
   "weight"
 ]);
 
+export const challengeMetricValues = [
+  "time",
+  "distance",
+  "reps",
+  "weight",
+] as const;
+
 export const usersTable = pgTable("users", {
    id: serial("id").primaryKey(),
   clerkId: text("clerk_id").notNull().unique(),

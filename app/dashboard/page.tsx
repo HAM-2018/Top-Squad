@@ -6,6 +6,7 @@ import IndividualChallenges from "./components/personal/personal-stats";
 import { createOrUpdateUser } from "@/db/mutations/createUser";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import TeamChallenges from "./components/teams/team.stats";
 
 
   export default function DashboardPage() {
@@ -34,7 +35,7 @@ import { useUser } from "@clerk/nextjs";
     <Tabs defaultValue="individual challenges">
       <TabsList className="mb-4">
         <TabsTrigger value="individual challenges">
-          individual challenges
+          Solo challenges
         </TabsTrigger>
         <TabsTrigger value="team challenges">
           Team challenges
@@ -44,7 +45,7 @@ import { useUser } from "@clerk/nextjs";
         <IndividualChallenges/>
       </TabsContent>
       <TabsContent value="team challenges">
-        team stats
+        <TeamChallenges />
       </TabsContent>
     </Tabs>
   );

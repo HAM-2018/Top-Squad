@@ -9,14 +9,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { CalendarIcon, TrophyIcon } from "lucide-react";
+import { CalendarIcon, PlusIcon, Trash2Icon, TrophyIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createChallengeSchema , type CreateChallenge} from "@/validation/createChallengeSchema";
 import z from "zod";
+import { challengeMetricValues } from "@/db/schema";
 
 type Teams = {
   id: number;
@@ -43,9 +43,22 @@ export default function ChallengeForm({
             isTeamBased: false,
             groupId: undefined,
             teamId: undefined,
+            parts: [{
+              name: "",
+              metric: "time",
+              targetValue: undefined,
+              unit: "",
+              sortOrder: 1,
+            },
+          ],
             ...defaultValues
         },
     });
+
+    const { fields: partFields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "parts",
+  });
 
     const isTeamBased = form.watch("isTeamBased");
 
@@ -60,6 +73,14 @@ export default function ChallengeForm({
         isTeamBased: false,
         groupId: undefined,
         teamId: undefined,
+        parts: [{
+          name: "",
+          metric: "time",
+          targetValue: undefined,
+          unit: "",
+          sortOrder: 1,
+          },
+        ],
       });
 
     }
@@ -272,6 +293,142 @@ export default function ChallengeForm({
                   )}
                  />
                  )}
+
+                {/* Challenge Parts */}
+                <div className="md:col-span-2 space-y-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Events</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        append({
+                          name: "",
+                          metric: "reps",
+                          targetValue: undefined,
+                          unit: "",
+                          sortOrder: (partFields.length || 0) + 1,
+                        })
+                      }
+                    >
+                      <PlusIcon className="w-4 h-4 mr-1" />
+                      Add part
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {partFields.map((field, index) => (
+                      <div
+                        key={field.id}
+                        className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
+                      >
+                        <FormField
+                          control={form.control}
+                          name={`parts.${index}.name` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Event Name</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="e.g. Push-ups, 1-mile run"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Metric */}
+                        <FormField
+                          control={form.control}
+                          name={`parts.${index}.metric` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Metric</FormLabel>
+                              <FormControl>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select metric" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {challengeMetricValues.map((metric) => (
+                                      <SelectItem key={metric} value={metric}>
+                                        {metric.charAt(0).toUpperCase() + metric.slice(1)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Target value */}
+                        <FormField
+                          control={form.control}
+                          name={`parts.${index}.targetValue` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Target (optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="e.g. 50"
+                                  value={field.value ?? ""}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      e.target.value === "" ? undefined : Number(e.target.value)
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Unit + remove button */}
+                        <div className="flex gap-2">
+                          <FormField
+                            control={form.control}
+                            name={`parts.${index}.unit` as any}
+                            render={({ field }) => (
+                              <FormItem className="flex-1">
+                                <FormLabel>Unit (optional)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="reps, seconds, meters..."
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {partFields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="self-end mb-[2px]"
+                              onClick={() => remove(index)}
+                            >
+                              <Trash2Icon className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
 
               </fieldset>
 
