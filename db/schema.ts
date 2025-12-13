@@ -118,3 +118,21 @@ export const challengeAttemptsTable = pgTable("challenge_attempts", {
   value: integer("value").notNull(),
   recordedAt: timestamp("recorded_at").defaultNow(),
 });
+
+export const challengeResultsTable = pgTable("challenge_results", {
+  id: serial("id").primaryKey(),
+  challengeId: integer("challenge_id")
+    .notNull()
+    .references(() => challengeTable.id, { onDelete: "cascade" }),
+  partId: integer("part_id")
+    .notNull()
+    .references(() => challengePartsTable.id, { onDelete: "cascade" }),
+  // SOLO / INDIVIDUAL RESULT
+  userId: integer("user_id")
+    .references(() => usersTable.id),
+  // TEAM RESULT (derived from individual attempts)
+  teamChallengeId: integer("team_challenge_id")
+    .references(() => teamChallengesTable.id, { onDelete: "cascade" }),
+  value: integer("value").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});

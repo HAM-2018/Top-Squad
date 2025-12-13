@@ -6,13 +6,31 @@ import Link from "next/link";
 import hs from '@/public/images/thailand.jpg';
 import Image from "next/image";
 import IndividualChallengeScores from "./individual-challenge-scores";
+import { formatTime } from "@/lib/formatTime";
+import { formatScore, metricCapitalize } from "@/lib/formatScore";
+import { IndividualChallengeStats } from "@/types/individualchallengeStats";
 
-export default function IndividualChallenges() {
-    
-    // Ranking logic, REVISIT 
-    const totalCompetitors = 80;
-    const ranking = 3;
-    const rankingPercentage = Math.round((ranking / totalCompetitors) * 100);
+
+
+export default function IndividualChallenges({
+    initialStats,
+}: {
+    initialStats: IndividualChallengeStats | null;
+}) {
+   
+    // CHANE THIS
+     if (!initialStats) {
+    return (
+      <div className="text-muted-foreground">
+        No challenge data available yet.
+      </div>
+    );
+  }
+
+    const rankingPercentage =
+        initialStats.myRank !== null
+        ? Math.round((initialStats.myRank / initialStats.totalCompetitors) * 100)
+        : null;
 
     return (
         <>
@@ -27,11 +45,17 @@ export default function IndividualChallenges() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             
-                            <span className="text-2xl font-bold">Ranking: 3rd</span>
+                            <span className="text-lg uppercase tracking-wide text-muted-foreground">Ranking: </span>
+                            <span className="text-2xl font-semibold">{initialStats.myRank ?? "-"}</span>
                         </div>
                     </div>
+                    <div className="h-px bg-border/60" />
                     <div>
-                        <span className="text-2xl font-bold">Score: 12:32</span>
+                        <span className="text-lg uppercase tracking-wide text-muted-foreground">
+                            {metricCapitalize(initialStats.metric)}:
+                        </span>
+                        <span className="font-mono text-2xl font-semibold tabular-nums">{"    "}
+                            {initialStats.myTime !== null ? formatScore(initialStats.myTime, initialStats.metric, initialStats.unit) : "-"}</span>
                     </div>
   
                 </CardContent>
@@ -44,7 +68,7 @@ export default function IndividualChallenges() {
                 </CardHeader>
                 <CardContent className="flex justify-between">
                      <div className="flex-gap-2">
-                        <div className="text-5xl font-bold">{totalCompetitors}</div>
+                        <div className="text-5xl font-bold">{initialStats.totalCompetitors}</div>
                      </div>
                      <div>
                      <Button asChild size="xs">
@@ -53,7 +77,7 @@ export default function IndividualChallenges() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    {rankingPercentage < 50 ?
+                    {rankingPercentage !== null && rankingPercentage < 50 ?
                     <span className="text-xs text-green-500 flex gap-1 items-center"> 
                         <BadgeCheckIcon />
                         You are in the top {rankingPercentage}% of all competitors
@@ -95,7 +119,7 @@ export default function IndividualChallenges() {
                 </CardTitle>
             </CardHeader>
             <CardContent className="pl-0">
-                <IndividualChallengeScores />
+                <IndividualChallengeScores rows={initialStats.chartRows} />
             </CardContent>
         </Card>
         </>

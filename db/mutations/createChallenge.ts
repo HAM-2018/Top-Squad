@@ -3,26 +3,56 @@
 import { CreateChallenge, createChallengeSchema } from "@/validation/createChallengeSchema";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "..";
-import { challengePartsTable, challengeTable, teamChallengesTable, usersTable } from "../schema";
-import { eq } from "drizzle-orm";
+import {
+  challengePartsTable,
+  challengeTable,
+  teamChallengesTable,
+  teamMembersTable,
+  usersTable,
+} from "../schema";
+import { eq, and } from "drizzle-orm";
 
-export async function createChallenge (input: CreateChallenge) {
-    const {name, description, startDate, endDate, isTeamBased, teamId, groupId, parts = []} = createChallengeSchema.parse(input);
+export async function createChallenge(input: CreateChallenge) {
+  const {
+    name,
+    description,
+    startDate,
+    endDate,
+    isTeamBased,
+    teamId,
+    groupId,
+    parts = [],
+  } = createChallengeSchema.parse(input);
 
-    const { userId } = await auth();
+  const { userId } = await auth();
+  if (!userId) throw new Error("User not authenticated");
 
-    if (!userId) throw new Error ("User not found");
-
-    const [user] = await db
+  const [user] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.clerkId, userId));
 
-    if (!user) throw new Error ("User not found");
+  if (!user) throw new Error("User not found");
 
-    const [challenge] = await db
-    .insert(challengeTable)
-    .values({
+  // Authorization must belong to host team
+  const membership = await db
+    .select()
+    .from(teamMembersTable)
+    .where(
+      and(
+        eq(teamMembersTable.teamId, groupId),
+        eq(teamMembersTable.userId, user.id)
+      )
+    );
+
+  if (membership.length === 0) {
+    throw new Error("Not authorized to create challenge for this team");
+  }
+
+  return await db.transaction(async (tx) => {
+    const [challenge] = await tx
+      .insert(challengeTable)
+      .values({
         name,
         description,
         startDate,
@@ -30,30 +60,39 @@ export async function createChallenge (input: CreateChallenge) {
         isTeamBased,
         groupId,
         createdByUserId: user.id,
-    })
-    .returning();
+      })
+      .returning();
 
     if (!challenge) throw new Error("Failed to create challenge");
 
+    // Create parts
     if (parts.length > 0) {
-        await db.insert(challengePartsTable).values(
+      await tx.insert(challengePartsTable).values(
         parts.map((part, index) => ({
-            challengeId: challenge.id,
-            name: part.name,
-            metric: part.metric,
-            targetValue: part.targetValue ?? null,
-            unit: part.unit ?? null,
-            sortOrder: part.sortOrder ?? index + 1,
-            })),
-        );
+          challengeId: challenge.id,
+          name: part.name,
+          metric: part.metric,
+          targetValue: part.targetValue ?? null,
+          unit: part.unit ?? null,
+          sortOrder: part.sortOrder ?? index + 1,
+        }))
+      );
     }
 
-    if (isTeamBased && teamId) {
-        await db.insert(teamChallengesTable).values({
-            teamId,
-            challengeId: challenge.id,
-        });
+    // ALWAYS create a team_challenges row forteam
+    await tx.insert(teamChallengesTable).values({
+      teamId: groupId,
+      challengeId: challenge.id,
+    });
+
+    // register another team for team-based events
+    if (isTeamBased && teamId && teamId !== groupId) {
+      await tx.insert(teamChallengesTable).values({
+        teamId,
+        challengeId: challenge.id,
+      });
     }
 
     return challenge;
+  });
 }
