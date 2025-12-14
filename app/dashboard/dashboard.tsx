@@ -7,12 +7,12 @@ import TeamChallenges from "./components/teams/team.stats";
 import { createOrUpdateUser } from "@/db/mutations/createUser";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { IndividualChallengeStats } from "@/types/individualchallengeStats";
+import { IndividualChallengeStats, MultiPartChallengeStats } from "@/types/individualchallengeStats";
 
 export default function Dashboard({
   soloStats,
 }: {
-  soloStats: IndividualChallengeStats | null;
+  soloStats: MultiPartChallengeStats | null;
 }) {
   const { user, isLoaded, isSignedIn } = useUser();
 

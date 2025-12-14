@@ -1,17 +1,35 @@
-export type IndividualChallengeStats = {
-  myRank: number | null;
-  myTime: number | null;
-  totalCompetitors: number;
+export type ChartRow = {
+  userId: number;
+  name: string;
+  time: number;
+  avatarUrl: string | null;
+};
+
+export type PartStats = {
+  partId: number;
+  partName: string;
   metric: "time" | "distance" | "reps" | "weight";
   unit: string | null;
 
-  firstPlace: {
-    name: string;
-    time: number;
-  } | null;
+  myRank: number | null;
+  myValue: number | null;
 
-  chartRows: {
-    name: string;
-    time: number;
-  }[];
+  totalCompetitors: number;
+  firstPlace: { name: string; value: number } | null;
+
+  chartRows: ChartRow[]; // ✅ array of rows
+};
+
+export type OverallStats = {
+  myRank: number | null;
+  myPoints: number | null;
+  totalCompetitors: number;
+  firstPlace: { name: string; points: number } | null;
+  chartRows: ChartRow[]; 
+};
+
+export type MultiPartChallengeStats = {
+  challengeId: number;
+  parts: PartStats[];
+  overall: OverallStats;
 };

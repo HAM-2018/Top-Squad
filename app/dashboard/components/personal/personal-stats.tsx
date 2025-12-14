@@ -1,25 +1,32 @@
+"use client";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangleIcon, BadgeCheckIcon, MedalIcon, PartyPopperIcon, TimerIcon, UserIcon, UsersIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertTriangleIcon,
+  BadgeCheckIcon,
+  MedalIcon,
+  PartyPopperIcon,
+  TimerIcon,
+  UserIcon,
+  UsersIcon,
+} from "lucide-react";
 import Link from "next/link";
-import hs from '@/public/images/thailand.jpg';
+import hs from "@/public/images/thailand.jpg";
 import Image from "next/image";
 import IndividualChallengeScores from "./individual-challenge-scores";
-import { formatTime } from "@/lib/formatTime";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
-import { IndividualChallengeStats } from "@/types/individualchallengeStats";
-
-
+import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
+import { useState } from "react";
 
 export default function IndividualChallenges({
-    initialStats,
+  initialStats,
 }: {
-    initialStats: IndividualChallengeStats | null;
+  initialStats: MultiPartChallengeStats | null;
 }) {
-   
-    // CHANE THIS
-     if (!initialStats) {
+  if (!initialStats) {
     return (
       <div className="text-muted-foreground">
         No challenge data available yet.
@@ -27,101 +34,206 @@ export default function IndividualChallenges({
     );
   }
 
-    const rankingPercentage =
-        initialStats.myRank !== null
-        ? Math.round((initialStats.myRank / initialStats.totalCompetitors) * 100)
-        : null;
+  const hasMultipleParts = initialStats.parts.length > 1;
 
-    return (
-        <>
-        <div className="grid lg:grid-cols-3 gap-4">
-            <Card>
-                <CardHeader className="py-0">
-                    <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-                        My Performance <UserIcon size={40} />
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            
-                            <span className="text-lg uppercase tracking-wide text-muted-foreground">Ranking: </span>
-                            <span className="text-2xl font-semibold">{initialStats.myRank ?? "-"}</span>
-                        </div>
-                    </div>
-                    <div className="h-px bg-border/60" />
-                    <div>
-                        <span className="text-lg uppercase tracking-wide text-muted-foreground">
-                            {metricCapitalize(initialStats.metric)}:
-                        </span>
-                        <span className="font-mono text-2xl font-semibold tabular-nums">{"    "}
-                            {initialStats.myTime !== null ? formatScore(initialStats.myTime, initialStats.metric, initialStats.unit) : "-"}</span>
-                    </div>
-  
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="py-0">
-                    <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-                        Competitors <UsersIcon size={40} />
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex justify-between">
-                     <div className="flex-gap-2">
-                        <div className="text-5xl font-bold">{initialStats.totalCompetitors}</div>
-                     </div>
-                     <div>
-                     <Button asChild size="xs">
-                            <Link href="/dashboard/challenges">View All</Link>
-                    </Button>
-                    </div>
-                </CardContent>
-                <CardFooter>
-                    {rankingPercentage !== null && rankingPercentage < 50 ?
-                    <span className="text-xs text-green-500 flex gap-1 items-center"> 
-                        <BadgeCheckIcon />
-                        You are in the top {rankingPercentage}% of all competitors
-                    </span> 
-                    : 
-                    <span className="text-xs text-yellow-500 flex gap-1 items-center"> 
-                        <AlertTriangleIcon />
-                        You are in the bottom {rankingPercentage}% of all competitors
-                    </span> 
-                    }
-                </CardFooter>
-            </Card>
-            <Card className="border-rose-500 min-h-[180px] flex flex-col">
-                <CardHeader className="py-0">
-                    <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-                        First place <MedalIcon size={40} />
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex gap-2 items-center">
-                    <Avatar>
-                        <Image src={hs} alt="First-place avatar"/>
-                        <AvatarFallback>
-                            HS
-                        </AvatarFallback>
-                    </Avatar>
-                    <span className="text-2xl">Haden Smith!</span>
-                </CardContent>
-                <CardFooter className="flex gap-2 items-center text-xs text-muted-foreground mt-auto">
-                    <PartyPopperIcon className="text-rose-500" />
-                    <span>Keep up the good work!</span>
-                </CardFooter>
-            </Card>
-        </div>
-        <Card className="my-4">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <TimerIcon />
-                    <span>Current Challenge times</span>   
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="pl-0">
-                <IndividualChallengeScores rows={initialStats.chartRows} />
-            </CardContent>
+  const [selected, setSelected] = useState<string>(() => {
+    if (!hasMultipleParts) return String(initialStats.parts[0]?.partId ?? "");
+    return "overall";
+  });
+
+  // If only one part do not allow "Overall" selection
+  const selectedPart =
+    hasMultipleParts
+      ? initialStats.parts.find((p) => String(p.partId) === selected) ?? null
+      : initialStats.parts[0] ?? null;
+
+  const isOverall = hasMultipleParts && selected === "overall";
+
+  const myRank = isOverall ? initialStats.overall.myRank : selectedPart?.myRank ?? null;
+  const totalCompetitors = isOverall
+    ? initialStats.overall.totalCompetitors
+    : selectedPart?.totalCompetitors ?? 0;
+
+  const label = isOverall
+    ? "Overall"
+    : selectedPart
+    ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
+    : "—";
+
+  const value = isOverall
+    ? initialStats.overall.myPoints !== null
+      ? `${initialStats.overall.myPoints} pts`
+      : "—"
+    : selectedPart && selectedPart.myValue !== null
+    ? formatScore(selectedPart.myValue, selectedPart.metric, selectedPart.unit)
+    : "—";
+
+  const rankingPercentage =
+    myRank !== null && totalCompetitors > 0
+      ? Math.round((myRank / totalCompetitors) * 100)
+      : null;
+
+  const chartRows = isOverall
+    ? initialStats.overall.chartRows
+    : selectedPart?.chartRows ?? [];
+
+  return (
+    <>
+      <div className="grid lg:grid-cols-3 gap-4">
+        {/* My Performance */}
+        <Card className="flex flex-col">
+          <CardHeader className="py-0">
+            <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
+              My Performance <UserIcon size={40} />
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="flex flex-col gap-3 pt-0">
+            {/* Dropdown: only show "Overall" if there are multiple parts */}
+            <Select value={selected} onValueChange={setSelected}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select event" />
+              </SelectTrigger>
+              <SelectContent>
+                {hasMultipleParts ? <SelectItem value="overall">Overall</SelectItem> : null}
+                {initialStats.parts.map((p) => (
+                  <SelectItem key={p.partId} value={String(p.partId)}>
+                    {p.partName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm uppercase tracking-wide text-muted-foreground">
+                Ranking
+              </span>
+              <span className="text-3xl font-semibold">
+                {myRank !== null ? `#${myRank}` : "—"}
+              </span>
+            </div>
+
+            <div className="h-px bg-border/60" />
+
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm uppercase tracking-wide text-muted-foreground">
+                {label}
+              </span>
+              <span className="font-mono text-4xl font-bold tabular-nums">
+                {value}
+              </span>
+            </div>
+          </CardContent>
         </Card>
-        </>
-    )
+
+          {/* Competitors */}
+         <Card className="flex flex-col">
+          <CardHeader className="py-0">
+            <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
+              Competitors <UsersIcon size={40} />
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="flex flex-col gap-3 pt-4">
+            {/* Top row: count + button */}
+            <div className="flex items-start justify-between">
+              <div className="text-4xl font-bold leading-none">
+                {totalCompetitors}
+              </div>
+
+              <Button asChild size="xs" className="mt-1">
+                <Link href="/dashboard/challenges">View All</Link>
+              </Button>
+            </div>
+
+            {/* Top 5 avatars */}
+            <div className="flex gap 2">
+              {chartRows.slice(0, 5).map((row) => {
+                const initials = row.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase();
+
+                return (
+                  <Avatar
+                    key={row.userId}
+                    className="h-10 w-10 border bg-background"
+                  >
+                    {row.avatarUrl ? (
+                      <img
+                        src={row.avatarUrl}
+                        alt={row.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <AvatarFallback className="text-xs font-medium">
+                        {initials}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                );
+              })}
+            </div>
+          </CardContent>
+
+          <CardFooter className="mt-auto">
+            {rankingPercentage !== null ? (
+              rankingPercentage < 50 ? (
+                <span className="text-xs text-green-500 flex gap-1 items-center">
+                  <BadgeCheckIcon />
+                  You are in the top {rankingPercentage}% of all competitors
+                </span>
+              ) : (
+                <span className="text-xs text-yellow-500 flex gap-1 items-center">
+                  <AlertTriangleIcon />
+                  You are in the bottom {rankingPercentage}% of all competitors
+                </span>
+              )
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                No ranking yet.
+              </span>
+            )}
+          </CardFooter>
+        </Card>
+
+
+        {/* First place (still placeholder UI) */}
+        <Card className="border-rose-500 min-h-[180px] flex flex-col">
+          <CardHeader className="py-0">
+            <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
+              First place <MedalIcon size={40} />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex gap-2 items-center">
+            <Avatar>
+              <Image src={hs} alt="First-place avatar" />
+              <AvatarFallback>HS</AvatarFallback>
+            </Avatar>
+            <span className="text-2xl">Haden Smith!</span>
+          </CardContent>
+          <CardFooter className="flex gap-2 items-center text-xs text-muted-foreground mt-auto">
+            <PartyPopperIcon className="text-rose-500" />
+            <span>Keep up the good work!</span>
+          </CardFooter>
+        </Card>
+      </div>
+
+      {/* Chart */}
+      <Card className="my-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TimerIcon />
+            <span>Current Challenge times</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pl-0">
+          <IndividualChallengeScores rows={chartRows} />
+        </CardContent>
+      </Card>
+    </>
+  );
 }
