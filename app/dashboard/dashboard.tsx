@@ -7,7 +7,7 @@ import TeamChallenges from "./components/teams/team.stats";
 import { createOrUpdateUser } from "@/db/mutations/createUser";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { IndividualChallengeStats, MultiPartChallengeStats } from "@/types/individualchallengeStats";
+import { MultiPartChallengeStats } from "@/types/individualchallengeStats";
 
 export default function Dashboard({
   soloStats,

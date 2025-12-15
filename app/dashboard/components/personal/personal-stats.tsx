@@ -112,9 +112,7 @@ export default function IndividualChallenges({
                 {myRank !== null ? `#${myRank}` : "—"}
               </span>
             </div>
-
             <div className="h-px bg-border/60" />
-
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm uppercase tracking-wide text-muted-foreground">
                 {label}
@@ -125,29 +123,19 @@ export default function IndividualChallenges({
             </div>
           </CardContent>
         </Card>
-
           {/* Competitors */}
          <Card className="flex flex-col">
           <CardHeader className="py-0">
             <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-              Competitors <UsersIcon size={40} />
+              Top-5 Competitors <UsersIcon size={40} />
             </CardTitle>
           </CardHeader>
+          <CardContent className="flex flex-col gap-2 pt-1">
 
-          <CardContent className="flex flex-col gap-3 pt-4">
-            {/* Top row: count + button */}
-            <div className="flex items-start justify-between">
-              <div className="text-4xl font-bold leading-none">
-                {totalCompetitors}
-              </div>
-
-              <Button asChild size="xs" className="mt-1">
-                <Link href="/dashboard/challenges">View All</Link>
-              </Button>
-            </div>
+           
 
             {/* Top 5 avatars */}
-            <div className="flex gap 2">
+            <div className="flex justify-center gap-2">
               {chartRows.slice(0, 5).map((row) => {
                 const initials = row.name
                   .split(" ")
@@ -156,12 +144,10 @@ export default function IndividualChallenges({
                   .slice(0, 2)
                   .join("")
                   .toUpperCase();
-
                 return (
                   <Avatar
                     key={row.userId}
-                    className="h-10 w-10 border bg-background"
-                  >
+                    className="h-10 w-10 border bg-background">
                     {row.avatarUrl ? (
                       <img
                         src={row.avatarUrl}
@@ -177,8 +163,17 @@ export default function IndividualChallenges({
                 );
               })}
             </div>
-          </CardContent>
+             {/* Top row: count + button */}
+            <div className="flex items-start justify-between">
+              <div className="text-4xl font-bold leading-none">
+                {totalCompetitors}
+              </div>
 
+              <Button asChild size="xs" className="mt-1">
+                <Link href="/dashboard/challenges">View All</Link>
+              </Button>
+            </div>
+          </CardContent>
           <CardFooter className="mt-auto">
             {rankingPercentage !== null ? (
               rankingPercentage < 50 ? (
@@ -200,7 +195,6 @@ export default function IndividualChallenges({
           </CardFooter>
         </Card>
 
-
         {/* First place (still placeholder UI) */}
         <Card className="border-rose-500 min-h-[180px] flex flex-col">
           <CardHeader className="py-0">
@@ -209,11 +203,42 @@ export default function IndividualChallenges({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex gap-2 items-center">
-            <Avatar>
-              <Image src={hs} alt="First-place avatar" />
-              <AvatarFallback>HS</AvatarFallback>
-            </Avatar>
-            <span className="text-2xl">Haden Smith!</span>
+            {(() => {
+              const first = chartRows?.[0];
+
+              if (!first) {
+                return (
+                  <span className="text-sm text-muted-foreground">
+                    No competitors yet.
+                  </span>
+                );
+              }
+              const initials = first.name
+                .split(" ")
+                .filter(Boolean)
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+              return (
+                <>
+                  <Avatar className="h-10 w-10 border bg-background">
+                    {first.avatarUrl ? (
+                      <img
+                        src={first.avatarUrl}
+                        alt={first.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <AvatarFallback className="text-xs font-medium">
+                        {initials}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <span className="text-2xl">{first.name}</span>
+                </>
+              );
+            })()}
           </CardContent>
           <CardFooter className="flex gap-2 items-center text-xs text-muted-foreground mt-auto">
             <PartyPopperIcon className="text-rose-500" />
@@ -236,4 +261,4 @@ export default function IndividualChallenges({
       </Card>
     </>
   );
-}
+} 
