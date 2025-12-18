@@ -34,6 +34,7 @@ export const teamsTable = pgTable("teams", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  avatarUrl: text("avatar_url"),
   ownerUserId: integer("owner_user_id").notNull().references(() => usersTable.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),

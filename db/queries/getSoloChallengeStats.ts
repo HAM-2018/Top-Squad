@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { challengeAttemptsTable, challengePartsTable, challengeTable, teamChallengesTable, usersTable } from "../schema";
-import { asc, eq, min, desc, max } from "drizzle-orm";
+import { challengeAttemptsTable, challengePartsTable, challengeTable, teamChallengesTable, teamMembersTable, usersTable } from "../schema";
+import { asc, eq, min, desc, max, and } from "drizzle-orm";
 import { db } from "..";
 import { MultiPartChallengeStats, } from "@/types/individualchallengeStats";
 
@@ -17,21 +17,40 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
 
   if (!user) throw new Error("User not found");
 
-  // Find most recent challenge with attempts by this user
+  // scope challenge to specific teamChallengeId
   const [challenge] = await db
-    .select({ challengeId: challengeTable.id })
-    .from(challengeTable)
-    .innerJoin(teamChallengesTable, eq(teamChallengesTable.challengeId, challengeTable.id))
-    .innerJoin(challengeAttemptsTable, eq(challengeAttemptsTable.teamChallengeId, teamChallengesTable.id))
+    .select({
+      challengeId: challengeTable.id,
+      teamChallengeId: teamChallengesTable.id,
+      teamId: teamChallengesTable.teamId 
+    })
+    .from(challengeAttemptsTable)
+    .innerJoin(
+    teamChallengesTable,
+    eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId)
+    )
+    .innerJoin(
+      challengeTable,
+      eq(challengeTable.id, teamChallengesTable.challengeId)
+    )
+    .innerJoin(
+      teamMembersTable,
+      and(
+        eq(teamMembersTable.teamId, teamChallengesTable.teamId),
+        eq(teamMembersTable.userId, challengeAttemptsTable.userId)
+      )
+    )
     .where(eq(challengeAttemptsTable.userId, user.id))
-    .orderBy(desc(challengeTable.createdAt)) // ✅ most recent
+    .orderBy(desc(challengeAttemptsTable.recordedAt))
     .limit(1);
 
   if (!challenge) return null;
 
   const challengeId = challenge.challengeId;
+  const teamChallengeId = challenge.teamChallengeId;
+  const teamId = challenge.teamId;
 
-  // ✅ Get ALL parts
+  // Get ALL parts
   const parts = await db
     .select()
     .from(challengePartsTable)
@@ -40,18 +59,17 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
 
   if (!parts.length) return null;
 
-  // We'll build per-part stats + overall "rank points"
+  //build per-part stats + overall "rank points"
   const pointsByUser = new Map<number, number>();
   const nameByUser = new Map<number,{ firstName: string | null; lastName: string | null; avatarUrl: string | null }>();
-
 
   const partStats = [];
 
   for (const part of parts) {
     const isTime = part.metric === "time";
 
-    // ✅ time: lower is better => MIN
-    // ✅ reps/weight/distance: higher is better => MAX (you can tweak distance later if needed)
+    // time: lower is better
+    // reps/weight/distance: higher is better
     const bestExpr = isTime ? min(challengeAttemptsTable.value) : max(challengeAttemptsTable.value);
 
     const leaderboard = await db
@@ -64,7 +82,19 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
       })
       .from(challengeAttemptsTable)
       .innerJoin(usersTable, eq(usersTable.id, challengeAttemptsTable.userId))
-      .where(eq(challengeAttemptsTable.challengePartId, part.id))
+      .innerJoin(
+        teamMembersTable,
+        and(
+          eq(teamMembersTable.teamId, teamId),
+          eq(teamMembersTable.userId, challengeAttemptsTable.userId)
+        )
+      )
+      .where(
+        and(
+          eq(challengeAttemptsTable.teamChallengeId, teamChallengeId),
+          eq(challengeAttemptsTable.challengePartId, part.id)
+        )
+      )
       .groupBy(challengeAttemptsTable.userId, usersTable.firstName, usersTable.lastName, usersTable.avatarUrl)
       .orderBy(isTime ? asc(bestExpr) : desc(bestExpr));
 
@@ -84,8 +114,6 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
         avatarUrl: string | null;
         bestValue: number;
       } => l.bestValue !== null);
-
-
 
     // Cache names for overall
     for (const l of normalized) {
@@ -133,7 +161,7 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
     });
   }
 
-  // ✅ Overall leaderboard by points (lower is better)
+  // Overall leaderboard by points (lower is better)
     const overallLeaderboard = Array.from(pointsByUser.entries())
     .map(([userId, points]) => {
       const info = nameByUser.get(userId);
@@ -147,8 +175,6 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
     })
     .sort((a, b) => a.points - b.points);
 
-
-
   const myOverallIndex = overallLeaderboard.findIndex((l) => l.userId === user.id);
   const myPoints = myOverallIndex >= 0 ? overallLeaderboard[myOverallIndex].points : null;
   const myOverallRank = myOverallIndex >= 0 ? myOverallIndex + 1 : null;
@@ -160,14 +186,12 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
         points: overallFirst.points,
       }
     : null;
-
     const overallChartRows = overallLeaderboard.slice(0, 10).map((l) => ({
     userId: l.userId,
     name: l.userId === user.id ? "You" : `${l.firstName ?? ""}`.trim(),
     time: l.points,
     avatarUrl: l.avatarUrl ?? null,
   }));
-
 
   return {
     challengeId,

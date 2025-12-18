@@ -14,12 +14,11 @@ import {
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
-import hs from "@/public/images/thailand.jpg";
-import Image from "next/image";
 import IndividualChallengeScores from "./individual-challenge-scores";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
 import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
 import { useState } from "react";
+import { initialsFromName } from "@/lib/initialsFromName";
 
 export default function IndividualChallenges({
   initialStats,
@@ -77,6 +76,15 @@ export default function IndividualChallenges({
     ? initialStats.overall.chartRows
     : selectedPart?.chartRows ?? [];
 
+    const chartData = chartRows.map(r => ({
+    ...r,
+    value: r.time, // normalize for chart
+  }));
+
+    const metric = isOverall ? "reps" : (selectedPart?.metric ?? "time");
+    const unit = isOverall ? null : (selectedPart?.unit ?? null);
+
+
   return (
     <>
       <div className="grid lg:grid-cols-3 gap-4">
@@ -132,18 +140,10 @@ export default function IndividualChallenges({
           </CardHeader>
           <CardContent className="flex flex-col gap-2 pt-1">
 
-           
-
             {/* Top 5 avatars */}
             <div className="flex justify-center gap-2">
               {chartRows.slice(0, 5).map((row) => {
-                const initials = row.name
-                  .split(" ")
-                  .filter(Boolean)
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase();
+                const initials = initialsFromName(row.name)
                 return (
                   <Avatar
                     key={row.userId}
@@ -163,15 +163,26 @@ export default function IndividualChallenges({
                 );
               })}
             </div>
-             {/* Top row: count + button */}
-            <div className="flex items-start justify-between">
-              <div className="text-4xl font-bold leading-none">
-                {totalCompetitors}
-              </div>
 
-              <Button asChild size="xs" className="mt-1">
-                <Link href="/dashboard/challenges">View All</Link>
-              </Button>
+             {/* Top row: count + button */}
+            <div className="flex items-baseline justify-between">
+                <span className="text-sm uppercase tracking-wide text-muted-foreground">Total</span>
+                <span className="text-3xl font-semibold tabular-nums">{totalCompetitors}</span>
+            </div>
+            <div className="flex justify-end">
+             <Button 
+             asChild size="xs"  
+             className="
+              h-6 px-2 text-[10px]
+              border border-rose-500
+              text-rose-500
+              hover:bg-rose-500/10
+              hover:text-rose-600" 
+              variant="ghost"
+              >
+                <Link href="/dashboard/teams">View All</Link>
+
+            </Button>
             </div>
           </CardContent>
           <CardFooter className="mt-auto">
@@ -195,7 +206,8 @@ export default function IndividualChallenges({
           </CardFooter>
         </Card>
 
-        {/* First place (still placeholder UI) */}
+        {/* First place */}
+
         <Card className="border-rose-500 min-h-[180px] flex flex-col">
           <CardHeader className="py-0">
             <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
@@ -213,13 +225,6 @@ export default function IndividualChallenges({
                   </span>
                 );
               }
-              const initials = first.name
-                .split(" ")
-                .filter(Boolean)
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")
-                .toUpperCase();
               return (
                 <>
                   <Avatar className="h-10 w-10 border bg-background">
@@ -231,7 +236,7 @@ export default function IndividualChallenges({
                       />
                     ) : (
                       <AvatarFallback className="text-xs font-medium">
-                        {initials}
+                        {initialsFromName(first.name)}
                       </AvatarFallback>
                     )}
                   </Avatar>
@@ -252,11 +257,11 @@ export default function IndividualChallenges({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TimerIcon />
-            <span>Current Challenge times</span>
+            <span>Challenge Results</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="pl-0">
-          <IndividualChallengeScores rows={chartRows} />
+          <IndividualChallengeScores rows={chartData} metric={metric} unit={unit} isOverall={isOverall} />
         </CardContent>
       </Card>
     </>
