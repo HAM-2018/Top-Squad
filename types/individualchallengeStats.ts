@@ -10,14 +10,12 @@ export type PartStats = {
   partName: string;
   metric: "time" | "distance" | "reps" | "weight";
   unit: string | null;
-
   myRank: number | null;
   myValue: number | null;
-
   totalCompetitors: number;
   firstPlace: { name: string; value: number } | null;
 
-  chartRows: ChartRow[]; // ✅ array of rows
+  chartRows: ChartRow[];
 };
 
 export type OverallStats = {
@@ -33,3 +31,25 @@ export type MultiPartChallengeStats = {
   parts: PartStats[];
   overall: OverallStats;
 };
+
+export type ChallengeParts = {
+  partId: number;
+  partName: string;
+  metric: "time" | "distance" | "reps" | "weight";
+  unit: string | null;
+  targetValue: number | null;
+  sortOrder: number;
+  isTeamLogOnly: boolean;
+};
+
+export type ChallengeWithParts = {
+  challengeId: number;
+  name: string;
+  description: string;
+  isTeamBased: boolean;
+  groupId: number;
+  groupName: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  parts: ChallengeParts[];
+}

@@ -135,7 +135,7 @@ export default function IndividualChallenges({
          <Card className="flex flex-col">
           <CardHeader className="py-0">
             <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-              Top-5 Competitors <UsersIcon size={40} />
+              Top Competitors <UsersIcon size={40} />
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 pt-1">

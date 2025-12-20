@@ -8,6 +8,7 @@ export const challengePartSchema = z.object({
     targetValue: z.number().int().positive().optional(),
     unit: z.string().optional(),
     sortOrder: z.number().int().min(1).optional(),
+    isTeamLogOnly: z.boolean().optional().default(false),
 });
 
 export const createChallengeSchema = z.object({
@@ -18,7 +19,8 @@ export const createChallengeSchema = z.object({
     isTeamBased: z.boolean().default(false),
     groupId: z.number().int(),
     teamId: z.number().int().optional(),
-    parts: z.array(challengePartSchema).min(1, "At least one event is required")
+    parts: z.array(challengePartSchema).min(1, "At least one event is required"),
+   
 })
 .superRefine((data, ctx) => {
     const now = new Date();

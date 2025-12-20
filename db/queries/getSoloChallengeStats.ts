@@ -40,7 +40,12 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
         eq(teamMembersTable.userId, challengeAttemptsTable.userId)
       )
     )
-    .where(eq(challengeAttemptsTable.userId, user.id))
+    .where(
+      and(
+        eq(challengeAttemptsTable.userId, user.id),
+        eq(challengeTable.isTeamBased, false)
+      )
+    )
     .orderBy(desc(challengeAttemptsTable.recordedAt))
     .limit(1);
 
@@ -143,7 +148,7 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
 
     const chartRows = normalized.slice(0, 10).map((l) => ({
       userId: l.userId,
-      name:l.userId === user.id ? "You" : `${l.firstName ?? ""} ${l.lastName ?? ""}`.trim(),
+      name: `${l.firstName ?? ""} ${l.lastName ?? ""}`.trim() || "Unknown",
       time: l.bestValue,
       avatarUrl: l.avatarUrl ?? null,
     }));
@@ -188,7 +193,7 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
     : null;
     const overallChartRows = overallLeaderboard.slice(0, 10).map((l) => ({
     userId: l.userId,
-    name: l.userId === user.id ? "You" : `${l.firstName ?? ""}`.trim(),
+    name: `${l.firstName ?? ""} ${l.lastName ?? ""}`.trim() || "Unknown",
     time: l.points,
     avatarUrl: l.avatarUrl ?? null,
   }));

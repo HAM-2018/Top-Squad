@@ -1,6 +1,6 @@
 "use server";
 
-import { CreateChallenge, createChallengeSchema } from "@/validation/createChallengeSchema";
+import {  type CreateChallenge, createChallengeSchema } from "@/validation/createChallengeSchema";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "..";
 import {
@@ -75,6 +75,7 @@ export async function createChallenge(input: CreateChallenge) {
           targetValue: part.targetValue ?? null,
           unit: part.unit ?? null,
           sortOrder: part.sortOrder ?? index + 1,
+          isTeamLogOnly: part.isTeamLogOnly ?? false,
         }))
       );
     }

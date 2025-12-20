@@ -84,6 +84,7 @@ export const challengePartsTable = pgTable("challenge_parts", {
   targetValue: integer("target_value"),
   unit: text("unit"),
   sortOrder: integer("sort_order").notNull().default(1),
+  isTeamLogOnly: boolean("is_team_log_only").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

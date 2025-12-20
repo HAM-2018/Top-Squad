@@ -1,17 +1,26 @@
 "use client";
-import ChallengeForm from "../components/challengeForm";
+import ChallengeForm from "./challengeForm";
 import { createChallenge } from "@/db/mutations/createChallenge";
 import { createChallengeSchema } from "@/validation/createChallengeSchema";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import z from "zod";
+import { ChallengeWithParts } from "@/types/individualchallengeStats";
 
 type Team = {
   id: number;
   name: string;
 };
 
-export default function NewChallengeForm({teams}: {teams: Team[]}) {
+
+
+export default function NewChallengeForm({
+  teams,
+  challenges,
+}:{
+  teams: Team[];
+  challenges: ChallengeWithParts[];
+}) {
   const router = useRouter();
 
   const handleSubmit = async (data: z.infer<typeof createChallengeSchema>) => {
@@ -41,6 +50,6 @@ export default function NewChallengeForm({teams}: {teams: Team[]}) {
   };
 
   return (
-    <ChallengeForm onSubmit={handleSubmit} teams={teams} />
+    <ChallengeForm onSubmit={handleSubmit} teams={teams} challenges={challenges} />
   );
 }

@@ -1,18 +1,20 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TabsContent } from "@radix-ui/react-tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import IndividualChallenges from "./components/personal/personal-stats";
 import TeamChallenges from "./components/teams/team.stats";
 import { createOrUpdateUser } from "@/db/mutations/createUser";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { MultiPartChallengeStats } from "@/types/individualchallengeStats";
+import { TeamChallengeStats } from "@/types/TeamChallengeStats";
 
 export default function Dashboard({
   soloStats,
+  teamStats,
 }: {
   soloStats: MultiPartChallengeStats | null;
+  teamStats: TeamChallengeStats | null;
 }) {
   const { user, isLoaded, isSignedIn } = useUser();
 
@@ -47,7 +49,7 @@ export default function Dashboard({
       </TabsContent>
 
       <TabsContent value="team challenges">
-        <TeamChallenges />
+        <TeamChallenges initialStats={teamStats} />
       </TabsContent>
     </Tabs>
   );
