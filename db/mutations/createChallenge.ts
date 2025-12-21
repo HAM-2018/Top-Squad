@@ -1,6 +1,6 @@
 "use server";
 
-import {  type CreateChallenge, createChallengeSchema } from "@/validation/createChallengeSchema";
+import { type CreateChallenge, createChallengeSchema } from "@/validation/createChallengeSchema";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "..";
 import {
@@ -19,7 +19,6 @@ export async function createChallenge(input: CreateChallenge) {
     startDate,
     endDate,
     isTeamBased,
-    teamId,
     groupId,
     parts = [],
   } = createChallengeSchema.parse(input);
@@ -34,9 +33,9 @@ export async function createChallenge(input: CreateChallenge) {
 
   if (!user) throw new Error("User not found");
 
-  // Authorization must belong to host team
-  const membership = await db
-    .select()
+  //must be admin/owner of host team
+  const [membership] = await db
+    .select({ role: teamMembersTable.role })
     .from(teamMembersTable)
     .where(
       and(
@@ -45,8 +44,9 @@ export async function createChallenge(input: CreateChallenge) {
       )
     );
 
-  if (membership.length === 0) {
-    throw new Error("Not authorized to create challenge for this team");
+  if (!membership) throw new Error("Not authorized to create challenge for this team");
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new Error("Only team owners/admins can create challenges");
   }
 
   return await db.transaction(async (tx) => {
@@ -75,24 +75,20 @@ export async function createChallenge(input: CreateChallenge) {
           targetValue: part.targetValue ?? null,
           unit: part.unit ?? null,
           sortOrder: part.sortOrder ?? index + 1,
-          isTeamLogOnly: part.isTeamLogOnly ?? false,
+          isTeamLogOnly: isTeamBased ? (part.isTeamLogOnly ?? false) : false,
         }))
       );
     }
 
-    // ALWAYS create a team_challenges row forteam
-    await tx.insert(teamChallengesTable).values({
-      teamId: groupId,
-      challengeId: challenge.id,
-    });
-
-    // register another team for team-based events
-    if (isTeamBased && teamId && teamId !== groupId) {
-      await tx.insert(teamChallengesTable).values({
-        teamId,
+    // Auto-join host team
+    await tx
+      .insert(teamChallengesTable)
+      .values({
+        teamId: groupId,
         challengeId: challenge.id,
-      });
-    }
+        isActive: true,
+      })
+      .onConflictDoNothing();
 
     return challenge;
   });

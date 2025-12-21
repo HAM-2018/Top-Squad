@@ -539,6 +539,11 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                         <span className="text-[10px] px-2 py-0.5 rounded-full border text-muted-foreground shrink-0">
                           {c.isTeamBased ? "Team" : "Solo"}
                         </span>
+                        {c.groupName ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border text-muted-foreground shrink-0">
+                            {c.groupName}
+                          </span>
+                        ): null}
                       </div>
 
                       <div className="text-xs text-muted-foreground mt-1 truncate">

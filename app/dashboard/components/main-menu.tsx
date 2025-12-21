@@ -33,6 +33,9 @@ export default function MainMenu() {
                 <MenuItem href="/dashboard/challenges">
                     Challenges
                 </MenuItem>
+                <MenuItem href="/dashboard/invites">
+                    Invites
+                </MenuItem>
                 <MenuItem href="/dashboard/account">
                     Account
                 </MenuItem>

@@ -1,5 +1,5 @@
-import { integer, pgTable, text, timestamp, serial, boolean, pgEnum } from "drizzle-orm/pg-core";
-
+import { integer, pgTable, text, timestamp, serial, boolean, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 //Team Roles
 export const teamRole = pgEnum("team_role", ["owner", "admin", "member"]);
@@ -39,7 +39,11 @@ export const teamsTable = pgTable("teams", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+},
+(t) => ({
+    // Case-insensitive uniqueness
+    uniqTeamNameLower: uniqueIndex("uniq_teams_name_lower").on(sql`lower(${t.name})`),
+  }));
 
 export const teamMembersTable = pgTable("team_members", {
   id: serial("id").primaryKey(),
@@ -99,7 +103,10 @@ export const teamChallengesTable = pgTable("team_challenges", {
     .references(() => challengeTable.id, { onDelete: "cascade" }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+},
+(t) => ({
+    uniqTeamChallenge: uniqueIndex("uniq_team_challenge").on(t.teamId, t.challengeId),
+  }));
 
 // Store results for each user per part of the challenge
 export const challengeAttemptsTable = pgTable("challenge_attempts", {
@@ -138,3 +145,32 @@ export const challengeResultsTable = pgTable("challenge_results", {
   value: integer("value").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+//Invite teams into the TeamChallenge
+export const inviteStatus = pgEnum("invite_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "revoked",
+]);
+export const challengeTeamInvitesTable = pgTable(
+  "challenge_team_invites",
+  {
+    id: serial("id").primaryKey(),
+    challengeId: integer("challenge_id")
+      .notNull()
+      .references(() => challengeTable.id, { onDelete: "cascade" }),
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teamsTable.id, { onDelete: "cascade" }),
+    invitedByUserId: integer("invited_by_user_id")
+      .notNull()
+      .references(() => usersTable.id),
+    status: inviteStatus("status").notNull().default("pending"),
+    createdAt: timestamp("created_at").defaultNow(),
+    respondedAt: timestamp("responded_at"),
+  },
+  (t) => ({
+    uniqInvite: uniqueIndex("uniq_challenge_team_invite").on(t.challengeId, t.teamId),
+  })
+);
