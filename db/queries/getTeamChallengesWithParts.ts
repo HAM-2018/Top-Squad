@@ -1,9 +1,15 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, and } from "drizzle-orm";
 import { db } from "@/db";
-import { challengePartsTable, challengeTable, teamsTable } from "@/db/schema";
+import {
+  challengePartsTable,
+  challengeTable,
+  teamsTable,
+  teamChallengesTable,
+  teamMembersTable,
+} from "@/db/schema";
 import type { ChallengeWithParts } from "@/types/individualchallengeStats";
 
-export async function getTeamChallengesWithPartsForUser(userDbId: number): Promise<ChallengeWithParts[]> {
+export async function getTeamChallengesForUser(userDbId: number): Promise<ChallengeWithParts[]> {
   const rows = await db
     .select({
       challengeId: challengeTable.id,
@@ -23,14 +29,18 @@ export async function getTeamChallengesWithPartsForUser(userDbId: number): Promi
       sortOrder: challengePartsTable.sortOrder,
       isTeamLogOnly: challengePartsTable.isTeamLogOnly,
     })
-    .from(challengeTable)
+    .from(teamMembersTable)
+    .innerJoin(teamChallengesTable, eq(teamChallengesTable.teamId, teamMembersTable.teamId))
+    .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
     .innerJoin(teamsTable, eq(teamsTable.id, challengeTable.groupId))
     .leftJoin(challengePartsTable, eq(challengePartsTable.challengeId, challengeTable.id))
     .where(
-        and(
-            eq(challengeTable.createdByUserId, userDbId),
-            eq(challengeTable.isTeamBased, true)
-        )
+      and(
+        eq(teamMembersTable.userId, userDbId),
+        eq(challengeTable.isTeamBased, true),
+        eq(challengeTable.isActive, true),
+        eq(teamChallengesTable.isActive, true)
+      )
     )
     .orderBy(desc(challengeTable.createdAt), asc(challengePartsTable.sortOrder));
 
