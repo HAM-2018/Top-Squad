@@ -257,7 +257,7 @@ export default function IndividualChallenges({
         </Card>
 
         {/* First place */}
-        <Card className="border-rose-500 min-h-[180px] flex flex-col">
+        <Card className="border-rose-500 min-h-45 flex flex-col">
           <CardHeader className="py-0">
             <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
               First place <MedalIcon size={40} />

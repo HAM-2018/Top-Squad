@@ -164,6 +164,14 @@ if (!challenge) return null;
       myTeamRank,
       myTeamValue,
       totalTeams: leaderboard.length,
+      teams: leaderboard.map((t, idx) => ({
+        teamId: t.teamId,
+        teamName: t.name,
+        avatarUrl: t.avatarUrl,
+        rank: idx + 1,
+        value: t.total,
+        isMyTeam: t.isMyTeam,
+      })),
       chartRows: leaderboard.slice(0, 10).map((t) => ({
         teamId: t.teamId,
         name: t.name,
@@ -198,6 +206,14 @@ if (!challenge) return null;
       myTeamRank: myOverallIndex >= 0 ? myOverallIndex + 1 : null,
       myTeamPoints: myOverallIndex >= 0 ? overallLeaderboard[myOverallIndex].points : null,
       totalTeams: overallLeaderboard.length,
+      teams: overallLeaderboard.map((t, idx) => ({
+        teamId: t.teamId,
+        teamName: t.name,
+        avatarUrl: t.avatarUrl,
+        rank: idx + 1,
+        points: t.points,
+        isMyTeam: t.isMyTeam,
+      })),
       chartRows: overallLeaderboard.slice(0, 10).map((t) => ({
         teamId: t.teamId,
         name: t.name,

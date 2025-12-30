@@ -6,6 +6,15 @@ export type TeamChartRow = {
   isMyTeam: boolean;
 };
 
+export type PartTeamRow = {
+  teamId: number;
+  teamName: string;
+  avatarUrl: string | null;
+  rank: number;
+  value: number;
+  isMyTeam: boolean;
+};
+
 export type TeamPartStats = {
   partId: number;
   partName: string;
@@ -16,6 +25,16 @@ export type TeamPartStats = {
   myTeamValue: number | null;
   totalTeams: number;
   chartRows: TeamChartRow[];
+  teams: PartTeamRow[];
+};
+
+export type OverallTeamRow = {
+  teamId: number;
+  teamName: string;
+  avatarUrl: string | null;
+  rank: number;
+  points: number;
+  isMyTeam: boolean;
 };
 
 export type TeamChallengeStats = {
@@ -28,5 +47,6 @@ export type TeamChallengeStats = {
     myTeamPoints: number | null;
     totalTeams: number;
     chartRows: TeamChartRow[];
+    teams: OverallTeamRow[];
   };
 };

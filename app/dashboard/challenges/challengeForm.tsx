@@ -451,7 +451,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="self-end mb-[2px]"
+                                className="self-end mb-0.5"
                                 onClick={() => remove(index)}
                               >
                                 <Trash2Icon className="w-4 h-4" />
@@ -459,8 +459,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                             )}
                           </div>
                         </div>
-
-                        {/*slide-down toggle for team log only (per part) */}
+                        {/*slide-down toggle for team log only */}
                         <div
                           className={cn(
                             "overflow-hidden transition-all duration-200 ease-in-out",

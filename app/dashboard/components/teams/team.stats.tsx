@@ -4,22 +4,27 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { HandshakeIcon, MedalIcon, PartyPopperIcon, TimerIcon, UsersIcon } from "lucide-react";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import Link from "next/link";
 import hs from '@/public/images/thailand.jpg';
 import Image from "next/image";
 import { TeamChallengeStats } from "@/types/TeamChallengeStats";
 import { useState } from "react";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export default function TeamChallenges({
     initialStats,
 }: {
     initialStats: TeamChallengeStats | null
 }) {
-    
-    if (!initialStats) {
-    return <div className="text-muted-foreground">No team challenge data available yet.</div>;
-    }
 
+
+    if (!initialStats) {
+        return (
+        <div className="text-muted-foreground">
+            No team challenge data available yet.
+        </div>
+        );
+    }
+    const parts = initialStats.parts ?? [];
     const hasMultipleParts = initialStats.parts.length > 1;
 
     const [selected, setSelected] = useState<string>(() => {
@@ -61,6 +66,8 @@ export default function TeamChallenges({
     myRank !== null && totalCompetitors > 0
         ? Math.round((myRank / totalCompetitors) * 100)
         : null;
+
+    const teams = isOverall ? initialStats.overall.teams : selectedPart?.teams ?? [];
 
 
     return (
@@ -117,12 +124,30 @@ export default function TeamChallenges({
                         Teams competing <UsersIcon size={40} />
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex justify-between">
-                    
+                <CardContent className="flex flex-wrap gap-2">
+                    {teams.map(team => (
+                        <TooltipProvider key={`${team.teamName}`}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                   <Avatar>
+                                     {!!team.avatarUrl &&
+                                     <Image src={team.avatarUrl} alt={`${team.teamName.slice(0,1)}`} /> 
+                                     }
+                                     <AvatarFallback>
+                                        {team.teamName[0]}
+                                        {team.teamName[1]}
+                                     </AvatarFallback> 
+                                   </Avatar> 
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {team.teamName}
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    ))}
                 </CardContent>
-               
             </Card>
-            <Card className="border-rose-500 min-h-[180px] flex flex-col">
+            <Card className="border-rose-500 min-h-45 flex flex-col">
                 <CardHeader className="py-0">
                     <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
                         First place Team <MedalIcon size={40} />
