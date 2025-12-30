@@ -11,13 +11,16 @@ import { TeamChallengeStats } from "@/types/TeamChallengeStats";
 import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+
 export default function TeamChallenges({
   initialStats,
 }: {
   initialStats: TeamChallengeStats | null;
 }) {
-  // ✅ safe even when null
-  const parts = initialStats?.parts ?? [];
+
+
+  const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
+
   const hasMultipleParts = parts.length > 1;
 
   // ✅ hook always runs (no conditional hooks)
@@ -32,9 +35,6 @@ export default function TeamChallenges({
     );
   }
 
-  // ✅ keep selection valid WITHOUT useEffect:
-  // - if only one part: force selection value used for calculations to that partId
-  // - if multiple parts: allow "overall" or a valid partId
   const effectiveSelected = useMemo(() => {
     if (parts.length === 0) return "overall";
     if (!hasMultipleParts) return String(parts[0].partId);
@@ -83,7 +83,6 @@ export default function TeamChallenges({
 
   const teams = isOverall ? initialStats.overall.teams : selectedPart?.teams ?? [];
 
-  // ✅ change selection ONLY in the handler (no effects)
   const handleSelect = (val: string) => {
     if (val === "overall") {
       if (hasMultipleParts) setSelected("overall");
