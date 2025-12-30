@@ -8,38 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import hs from "@/public/images/thailand.jpg";
 import Image from "next/image";
 import { TeamChallengeStats } from "@/types/TeamChallengeStats";
-import { useEffect, useMemo, useState } from "react";
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useMemo, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function TeamChallenges({
   initialStats,
 }: {
   initialStats: TeamChallengeStats | null;
 }) {
-  // ✅ safe derived values even when null
+  // ✅ safe even when null
   const parts = initialStats?.parts ?? [];
   const hasMultipleParts = parts.length > 1;
 
-  // ✅ hook runs every render (never conditional)
+  // ✅ hook always runs (no conditional hooks)
   const [selected, setSelected] = useState<string>("overall");
-
-  // ✅ ensure selected is valid once stats/parts exist
-  useEffect(() => {
-    if (parts.length === 0) return;
-
-    // if only one part, force selection to that part
-    if (!hasMultipleParts) {
-      const onlyId = String(parts[0].partId);
-      setSelected(onlyId);
-      return;
-    }
-
-    // multiple parts: default to "overall" if current selection isn't valid
-    const valid =
-      selected === "overall" || parts.some((p) => String(p.partId) === selected);
-
-    if (!valid) setSelected("overall");
-  }, [parts.length, hasMultipleParts]); // intentionally not depending on `selected` to avoid loops
 
   // ✅ render empty state AFTER hooks
   if (!initialStats) {
@@ -50,14 +32,31 @@ export default function TeamChallenges({
     );
   }
 
-  // from here on, initialStats is non-null
+  // ✅ keep selection valid WITHOUT useEffect:
+  // - if only one part: force selection value used for calculations to that partId
+  // - if multiple parts: allow "overall" or a valid partId
+  const effectiveSelected = useMemo(() => {
+    if (parts.length === 0) return "overall";
+    if (!hasMultipleParts) return String(parts[0].partId);
+
+    // multiple parts
+    if (selected === "overall") return "overall";
+
+    const exists = parts.some((p) => String(p.partId) === selected);
+    return exists ? selected : "overall";
+  }, [parts, hasMultipleParts, selected]);
+
+  // selected part (if not overall)
   const selectedPart =
-    hasMultipleParts
-      ? parts.find((p) => String(p.partId) === selected) ?? null
-      : parts[0] ?? null;
+    hasMultipleParts && effectiveSelected !== "overall"
+      ? parts.find((p) => String(p.partId) === effectiveSelected) ?? null
+      : !hasMultipleParts
+      ? parts[0] ?? null
+      : null;
 
-  const isOverall = hasMultipleParts && selected === "overall";
+  const isOverall = hasMultipleParts && effectiveSelected === "overall";
 
+  // TEAM RANK / TOTAL TEAMS
   const myRank = isOverall
     ? initialStats.overall.myTeamRank
     : selectedPart?.myTeamRank ?? null;
@@ -66,12 +65,14 @@ export default function TeamChallenges({
     ? initialStats.overall.totalTeams
     : selectedPart?.totalTeams ?? 0;
 
+  // LABEL
   const label = isOverall
     ? "Overall"
     : selectedPart
     ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
     : "—";
 
+  // VALUE
   const value = isOverall
     ? initialStats.overall.myTeamPoints !== null
       ? `${initialStats.overall.myTeamPoints} pts`
@@ -81,6 +82,15 @@ export default function TeamChallenges({
     : "—";
 
   const teams = isOverall ? initialStats.overall.teams : selectedPart?.teams ?? [];
+
+  // ✅ change selection ONLY in the handler (no effects)
+  const handleSelect = (val: string) => {
+    if (val === "overall") {
+      if (hasMultipleParts) setSelected("overall");
+      return;
+    }
+    setSelected(val);
+  };
 
   return (
     <>
@@ -93,7 +103,8 @@ export default function TeamChallenges({
           </CardHeader>
 
           <CardContent className="flex flex-col gap-3 pt-0">
-            <Select value={selected} onValueChange={setSelected}>
+            {/* Dropdown */}
+            <Select value={effectiveSelected} onValueChange={handleSelect}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select event" />
               </SelectTrigger>
@@ -143,7 +154,7 @@ export default function TeamChallenges({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Avatar>
-                      {!!team.avatarUrl ? (
+                      {team.avatarUrl ? (
                         <Image
                           src={team.avatarUrl}
                           alt={team.teamName}
