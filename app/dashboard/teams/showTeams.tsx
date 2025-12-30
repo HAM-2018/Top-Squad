@@ -55,8 +55,6 @@ export default function ShowTeams({
       return;
     }
 
-    setFetchedMembers(null);
-
     startTransition(async () => {
       const next = await getTeamMembers(Number(selectedTeamId));
       setFetchedMembers(next);
@@ -85,7 +83,14 @@ export default function ShowTeams({
                   Select a team to view members:
                 </div>
 
-                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                <Select
+                value={selectedTeamId}
+                onValueChange={(val) => {
+                    setSelectedTeamId(val);
+                    setFetchedMembers(null); // reset state
+                }}
+                >
+
                   <SelectTrigger className="w-[260px]">
                     <SelectValue placeholder="Choose a team" />
                   </SelectTrigger>
