@@ -6,7 +6,10 @@ import { MultiPartChallengeStats, } from "@/types/individualchallengeStats";
 
 
 
-export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats | null> {
+export async function getSoloChallengeStats(input?: {
+  teamChallengeId?: number;
+}): Promise<MultiPartChallengeStats | null> {
+
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
@@ -18,21 +21,29 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
   if (!user) throw new Error("User not found");
 
   // scope challenge to specific teamChallengeId
+  const whereClause = input?.teamChallengeId
+    ? and(
+        eq(challengeAttemptsTable.userId, user.id),
+        eq(challengeTable.isTeamBased, false),
+        eq(challengeAttemptsTable.teamChallengeId, input.teamChallengeId)
+      )
+    : and(
+        eq(challengeAttemptsTable.userId, user.id),
+        eq(challengeTable.isTeamBased, false)
+      );
+
   const [challenge] = await db
     .select({
       challengeId: challengeTable.id,
       teamChallengeId: teamChallengesTable.id,
-      teamId: teamChallengesTable.teamId 
+      teamId: teamChallengesTable.teamId,
     })
     .from(challengeAttemptsTable)
     .innerJoin(
-    teamChallengesTable,
-    eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId)
+      teamChallengesTable,
+      eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId)
     )
-    .innerJoin(
-      challengeTable,
-      eq(challengeTable.id, teamChallengesTable.challengeId)
-    )
+    .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
     .innerJoin(
       teamMembersTable,
       and(
@@ -40,14 +51,10 @@ export async function getSoloChallengeStats(): Promise<MultiPartChallengeStats |
         eq(teamMembersTable.userId, challengeAttemptsTable.userId)
       )
     )
-    .where(
-      and(
-        eq(challengeAttemptsTable.userId, user.id),
-        eq(challengeTable.isTeamBased, false)
-      )
-    )
+    .where(whereClause)
     .orderBy(desc(challengeAttemptsTable.recordedAt))
     .limit(1);
+
 
   if (!challenge) return null;
 

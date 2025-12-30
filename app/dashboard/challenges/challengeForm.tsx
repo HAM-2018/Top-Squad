@@ -553,7 +553,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                       <div className="mt-2 flex flex-wrap gap-2">
                         {c.parts.slice(0, 4).map((p) => (
                           <span
-                            key={p.partId}
+                            key={`${c.challengeId}-${p.partId}`}
                             className="text-[10px] px-2 py-1 rounded-full border text-muted-foreground"
                           >
                             {p.partName} • {p.metric}

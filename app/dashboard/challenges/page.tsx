@@ -1,11 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import NewChallengeForm from "./newChallengeForm";
 import { db } from "@/db";
-import { challengePartsTable, challengeTable, teamMembersTable, teamsTable, usersTable } from "@/db/schema";
-import { asc, desc, eq } from "drizzle-orm";
+import { teamMembersTable, teamsTable, usersTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import LogScoreCard from "./logScoreCard.";
 import { getRecordableChallenges } from "@/db/queries/getRecordableChallenges";
-import { ChallengeWithParts } from "@/types/individualchallengeStats";
 import { getChallengesWithPartsForUser } from "@/db/queries/getChallengesWithEvents";
 
 export default async function ChallengesPage() {

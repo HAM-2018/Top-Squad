@@ -1,6 +1,8 @@
+import { syncUserAvatar } from "@/db/mutations/syncUserAvatars";
 import { UserProfile } from "@clerk/nextjs";
 
-export default function AccountPage() {
+export default async function AccountPage() {
+  await syncUserAvatar();
   return (
     <div className="p-4">
       <div className="mb-4">

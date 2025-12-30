@@ -6,9 +6,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UsersIcon } from "lucide-react";
+import { UserPlus, UsersIcon } from "lucide-react";
 import { initialsFromName } from "@/lib/initialsFromName";
 import TeamMemberDropdown from "./teamMemberDropdown";
+import CreateTeamCard from "./createTeam";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 
 export default function ShowTeams({
@@ -84,7 +87,7 @@ export default function ShowTeams({
                     key={team.id}
                     className="rounded-lg border p-3 flex items-center gap-3"
                     >
-                    {/* TEAM AVATAR — goes here */}
+                    {/* TEAM AVATAR*/}
                     <Avatar className="h-10 w-10 border bg-background shrink-0">
                         {team.avatarUrl ? (
                         <img
@@ -114,16 +117,31 @@ export default function ShowTeams({
             </CardContent>
         </Card>
 
-        {/* Card 2: team members */}
         <Card>
             <CardHeader className="py-0">
-            <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-                Team Members
-                <span className="text-sm font-normal text-muted-foreground">
-                {selectedTeam ? selectedTeam.name : "—"}
-                </span>
-            </CardTitle>
+                <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-2">
+                    <div className="flex items-center gap-2 ">
+                        Team Members
+                    <span className="text-sm font-normal text-muted-foreground">
+                        {selectedTeam ? selectedTeam.name : "—"}
+                    </span>
+                    </div>
+
+                    {selectedTeamId && (
+                    <Button
+                        asChild
+                        size="sm"
+                        variant="secondary"
+                    >
+                    <Link href={`/dashboard/invites`}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Invite
+                    </Link>
+                    </Button>
+                )}
+                </CardTitle>
             </CardHeader>
+
 
             <CardContent className="pt-4">
             {!selectedTeamId ? (
@@ -170,7 +188,10 @@ export default function ShowTeams({
             )}
             </CardContent>
         </Card>
+        <CreateTeamCard onCreate={(newTeamId) => {
+            setSelectedTeamId(String(newTeamId));
+        }} 
+        />
         </>
-    );
-    
+    );    
 }
