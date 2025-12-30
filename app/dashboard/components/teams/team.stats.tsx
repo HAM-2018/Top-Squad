@@ -4,29 +4,32 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { HandshakeIcon, MedalIcon, PartyPopperIcon, TimerIcon, UsersIcon } from "lucide-react";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import hs from "@/public/images/thailand.jpg";
 import Image from "next/image";
 import { TeamChallengeStats } from "@/types/TeamChallengeStats";
 import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-
 export default function TeamChallenges({
   initialStats,
 }: {
   initialStats: TeamChallengeStats | null;
 }) {
-
-
+  // memoized parts (lint-safe)
   const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
-
   const hasMultipleParts = parts.length > 1;
 
-  // ✅ hook always runs (no conditional hooks)
+  // state stays exactly the same
   const [selected, setSelected] = useState<string>("overall");
 
-  // ✅ render empty state AFTER hooks
+  // early return AFTER hooks
   if (!initialStats) {
     return (
       <div className="text-muted-foreground">
@@ -35,26 +38,13 @@ export default function TeamChallenges({
     );
   }
 
-  const effectiveSelected = useMemo(() => {
-    if (parts.length === 0) return "overall";
-    if (!hasMultipleParts) return String(parts[0].partId);
-
-    // multiple parts
-    if (selected === "overall") return "overall";
-
-    const exists = parts.some((p) => String(p.partId) === selected);
-    return exists ? selected : "overall";
-  }, [parts, hasMultipleParts, selected]);
-
-  // selected part (if not overall)
+  // selected part logic (unchanged behavior)
   const selectedPart =
-    hasMultipleParts && effectiveSelected !== "overall"
-      ? parts.find((p) => String(p.partId) === effectiveSelected) ?? null
-      : !hasMultipleParts
-      ? parts[0] ?? null
-      : null;
+    selected === "overall"
+      ? null
+      : parts.find((p) => String(p.partId) === selected) ?? null;
 
-  const isOverall = hasMultipleParts && effectiveSelected === "overall";
+  const isOverall = selected === "overall";
 
   // TEAM RANK / TOTAL TEAMS
   const myRank = isOverall
@@ -78,18 +68,16 @@ export default function TeamChallenges({
       ? `${initialStats.overall.myTeamPoints} pts`
       : "—"
     : selectedPart && selectedPart.myTeamValue !== null
-    ? formatScore(selectedPart.myTeamValue, selectedPart.metric, selectedPart.unit)
+    ? formatScore(
+        selectedPart.myTeamValue,
+        selectedPart.metric,
+        selectedPart.unit
+      )
     : "—";
 
-  const teams = isOverall ? initialStats.overall.teams : selectedPart?.teams ?? [];
-
-  const handleSelect = (val: string) => {
-    if (val === "overall") {
-      if (hasMultipleParts) setSelected("overall");
-      return;
-    }
-    setSelected(val);
-  };
+  const teams = isOverall
+    ? initialStats.overall.teams
+    : selectedPart?.teams ?? [];
 
   return (
     <>
@@ -103,14 +91,14 @@ export default function TeamChallenges({
 
           <CardContent className="flex flex-col gap-3 pt-0">
             {/* Dropdown */}
-            <Select value={effectiveSelected} onValueChange={handleSelect}>
+            <Select value={selected} onValueChange={setSelected}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select event" />
               </SelectTrigger>
               <SelectContent>
-                {hasMultipleParts ? (
+                {hasMultipleParts && (
                   <SelectItem value="overall">Overall</SelectItem>
-                ) : null}
+                )}
                 {parts.map((p) => (
                   <SelectItem key={p.partId} value={String(p.partId)}>
                     {p.partName}
