@@ -2,7 +2,7 @@
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { HandshakeIcon, MedalIcon, PartyPopperIcon, StarIcon, TimerIcon, UsersIcon } from "lucide-react";
+import { HandshakeIcon, MedalIcon, PartyPopperIcon, StarIcon, TimerIcon } from "lucide-react";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
 import {
   Select,
@@ -18,11 +18,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import TeamStatsGraph from "./team.stats.graph";
 import TeamLineGraph from "./team.stats.line.graph";
 import { TeamProgress } from "@/types/lineGraphStats";
-
-type ProgressPoint = {
-  t: string;
-  [key: string]: number | string | null;
-};
 
 export default function TeamChallenges({
   initialStats,
@@ -109,33 +104,6 @@ export default function TeamChallenges({
   // y-axis reversal only time should be reversed 
   const reversed = !isOverall && selectedPart?.metric === "time";
 
-  if (!initialStats) {
-    return <div className="text-muted-foreground">No team challenge data available yet.</div>;
-  }
-
-  // TEAM RANK / TOTAL TEAMS
-  const myRank = isOverall
-    ? initialStats.overall.myTeamRank
-    : selectedPart?.myTeamRank ?? null;
-
-  const label = isOverall
-    ? "Overall"
-    : selectedPart
-    ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
-    : "—";
-
-  const value = isOverall
-    ? initialStats.overall.myTeamPoints !== null
-      ? `${initialStats.overall.myTeamPoints} pts`
-      : "—"
-    : selectedPart && selectedPart.myTeamValue !== null
-    ? formatScore(
-        selectedPart.myTeamValue,
-        selectedPart.metric,
-        selectedPart.unit
-      )
-    : "—";
-
   const firstPlaceTeam = useMemo(() => {
     const ranked = teams.filter((t) => t.rank !== null) as Array<
       typeof teams[number] & { rank: number }
@@ -162,6 +130,33 @@ export default function TeamChallenges({
       ? formatScore(val, selectedPart.metric, selectedPart.unit)
       : "—";
   }, [firstPlaceTeam, isOverall, selectedPart]);
+
+  if (!initialStats) {
+    return <div className="text-muted-foreground">No team challenge data available yet.</div>;
+  }
+
+  // TEAM RANK / TOTAL TEAMS
+  const myRank = isOverall
+    ? initialStats.overall.myTeamRank
+    : selectedPart?.myTeamRank ?? null;
+
+  const label = isOverall
+    ? "Overall"
+    : selectedPart
+    ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
+    : "—";
+
+  const value = isOverall
+    ? initialStats.overall.myTeamPoints !== null
+      ? `${initialStats.overall.myTeamPoints} pts`
+      : "—"
+    : selectedPart && selectedPart.myTeamValue !== null
+    ? formatScore(
+        selectedPart.myTeamValue,
+        selectedPart.metric,
+        selectedPart.unit
+      )
+    : "—";
 
 
   return (
