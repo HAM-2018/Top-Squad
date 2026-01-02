@@ -10,8 +10,8 @@ export type PartTeamRow = {
   teamId: number;
   teamName: string;
   avatarUrl: string | null;
-  rank: number;
-  value: number;
+  rank: number | null;
+  value: number | null;
   isMyTeam: boolean;
 };
 

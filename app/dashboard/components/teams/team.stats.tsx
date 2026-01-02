@@ -2,7 +2,7 @@
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { HandshakeIcon, MedalIcon, PartyPopperIcon, TimerIcon, UsersIcon } from "lucide-react";
+import { HandshakeIcon, MedalIcon, PartyPopperIcon, StarIcon, TimerIcon, UsersIcon } from "lucide-react";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
 import {
   Select,
@@ -11,25 +11,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import hs from "@/public/images/thailand.jpg";
 import Image from "next/image";
 import { TeamChallengeStats } from "@/types/TeamChallengeStats";
 import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import TeamStatsGraph from "./team.stats.graph";
+import TeamLineGraph from "./team.stats.line.graph";
 
 export default function TeamChallenges({
   initialStats,
 }: {
   initialStats: TeamChallengeStats | null;
 }) {
-  // memoized parts (lint-safe)
+  
   const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
   const hasMultipleParts = parts.length > 1;
-
-  // state stays exactly the same
   const [selected, setSelected] = useState<string>("overall");
 
-  // early return AFTER hooks
   if (!initialStats) {
     return (
       <div className="text-muted-foreground">
@@ -38,7 +36,7 @@ export default function TeamChallenges({
     );
   }
 
-  // selected part logic (unchanged behavior)
+  // selected part logic
   const selectedPart =
     selected === "overall"
       ? null
@@ -46,14 +44,33 @@ export default function TeamChallenges({
 
   const isOverall = selected === "overall";
 
+  // graph logic
+
+  const graphRows = useMemo(() => {
+  if (isOverall) {
+    return initialStats.overall.chartRows.map((r) => ({
+      name: r.name,
+      value: r.time,
+      isMyTeam: r.isMyTeam,
+    }));
+  }
+
+  if (!selectedPart) return [];
+
+  return selectedPart.chartRows.map((r) => ({
+    name: r.name,
+    value: r.time,
+    isMyTeam: r.isMyTeam,
+  }));
+}, [initialStats, isOverall, selectedPart]);
+
+  const graphMetric = isOverall ? "reps" : selectedPart?.metric ?? "reps";
+  const graphUnit = isOverall ? null : selectedPart?.unit ?? null;
+
   // TEAM RANK / TOTAL TEAMS
   const myRank = isOverall
     ? initialStats.overall.myTeamRank
     : selectedPart?.myTeamRank ?? null;
-
-  const totalCompetitors = isOverall
-    ? initialStats.overall.totalTeams
-    : selectedPart?.totalTeams ?? 0;
 
   // LABEL
   const label = isOverall
@@ -78,6 +95,34 @@ export default function TeamChallenges({
   const teams = isOverall
     ? initialStats.overall.teams
     : selectedPart?.teams ?? [];
+
+  const firstPlaceTeam = useMemo(() => {
+    const ranked = teams.filter((t) => t.rank !== null) as Array<
+      typeof teams[number] & { rank: number }
+    >;
+
+    if (ranked.length === 0) return null;
+
+    // rank 1 wins
+    return ranked.reduce((best, cur) => (cur.rank < best.rank ? cur : best), ranked[0]);
+  }, [teams]);
+
+  const firstPlaceScore = useMemo(() => {
+    if (!firstPlaceTeam) return "—";
+
+    if (isOverall) {
+      // overall uses points
+      const pts = (firstPlaceTeam as any).points as number | null | undefined;
+      return pts != null ? `${pts} pts` : "—";
+    }
+
+    // part uses value + metric formatting
+    const val = (firstPlaceTeam as any).value as number | null | undefined;
+    return val != null && selectedPart
+      ? formatScore(val, selectedPart.metric, selectedPart.unit)
+      : "—";
+  }, [firstPlaceTeam, isOverall, selectedPart]);
+
 
   return (
     <>
@@ -132,10 +177,11 @@ export default function TeamChallenges({
         <Card>
           <CardHeader className="py-0">
             <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-              Teams competing <UsersIcon size={40} />
+              Teams competing <StarIcon className="text-yellow-500" size={40} />
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
+          <CardContent className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
             {teams.map((team) => (
               <TooltipProvider key={team.teamName}>
                 <Tooltip>
@@ -147,9 +193,10 @@ export default function TeamChallenges({
                           alt={team.teamName}
                           width={40}
                           height={40}
+                          className="rounded-full object-cover"
                         />
                       ) : null}
-                      <AvatarFallback>
+                      <AvatarFallback className="font-semibold">
                         {team.teamName.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -158,25 +205,55 @@ export default function TeamChallenges({
                 </Tooltip>
               </TooltipProvider>
             ))}
+            </div>
+            <div className=" text-muted-foreground pt-4">
+              Total: {teams.length} 
+            </div>
           </CardContent>
         </Card>
 
         <Card className="border-rose-500 min-h-45 flex flex-col">
           <CardHeader className="py-0">
             <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-              First place Team <MedalIcon size={40} />
+              First place <MedalIcon className="text-yellow-500" size={40} />
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex gap-2 items-center">
-            <Avatar>
-              <Image src={hs} alt="First-place avatar" />
-              <AvatarFallback>HS</AvatarFallback>
-            </Avatar>
-            <span className="text-2xl">RLTW!</span>
+
+          <CardContent className="flex gap-3 items-center">
+            {!firstPlaceTeam ? (
+              <p className="text-sm text-muted-foreground">No scores yet.</p>
+            ) : (
+              <>
+                <Avatar>
+                  {firstPlaceTeam.avatarUrl ? (
+                    <Image
+                      src={firstPlaceTeam.avatarUrl}
+                      alt={firstPlaceTeam.teamName}
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="font-semibold">
+                    {firstPlaceTeam.teamName.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0">
+                  <div className="text-2xl font-semibold truncate">
+                    {firstPlaceTeam.teamName}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {isOverall ? "Overall leader" : "Event leader"} • {firstPlaceScore}
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
+
           <CardFooter className="flex gap-2 items-center text-xs text-muted-foreground mt-auto">
             <PartyPopperIcon className="text-rose-500" />
-            <span>Keep up the good work!</span>
+            <span>{firstPlaceTeam ? "Keep up the pressure!" : "Log attempts to start ranking."}</span>
           </CardFooter>
         </Card>
       </div>
@@ -188,7 +265,25 @@ export default function TeamChallenges({
             <span>Current Team scores</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pl-0">Line Graph</CardContent>
+        <CardContent>
+          <TeamStatsGraph
+          rows={graphRows}
+          metric={graphMetric}
+          unit={graphUnit}
+          isOverall={isOverall} 
+          />
+        </CardContent>
+      </Card>
+      <Card className="my-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TimerIcon />
+            <span>Current Team scores</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TeamLineGraph />
+        </CardContent>
       </Card>
     </>
   );

@@ -1,15 +1,16 @@
-"use client"
-import ChallengeLegend from "@/components/ui/soloGraphLegend";
+
+import ChallengeLegend from "@/components/ui/teamsGraphLegend";
 import { Bar, BarChart, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatScore } from "@/lib/formatScore";
 
 type ChartRow = {
   name: string;
   value: number;
+  isMyTeam?: boolean;
 };
 
 
-export default function IndividualChallengeScores({
+export default function TeamStatsGraph({
   rows,
   metric,
   unit,
@@ -55,7 +56,7 @@ export default function IndividualChallengeScores({
               {rows.map((entry, index) => (
                 <Cell
                 key={`cell-${index}`}
-                fill={entry!.name === "You" ? "#22c55e" : "#f43f5e"} />
+                fill={entry!.isMyTeam ? "#22c55e" : "#f43f5e"} />
               ))}
             </Bar>
           </BarChart>
