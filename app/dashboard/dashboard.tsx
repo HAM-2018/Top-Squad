@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TeamProgress } from "@/types/lineGraphStats";
 
 export default function Dashboard({
   soloStats,
@@ -28,6 +29,7 @@ export default function Dashboard({
   teams,
   selectedTeamId,
   teamStats,
+  teamProgress,
 }: {
   soloStats: MultiPartChallengeStats | null;
   soloOptions: SoloChallengeOption[];
@@ -37,6 +39,7 @@ export default function Dashboard({
   selectedTeamId: number | null;
 
   teamStats: TeamChallengeStats | null;
+  teamProgress: TeamProgress | null;
 }) {
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
@@ -101,7 +104,6 @@ export default function Dashboard({
 
   if (!isLoaded || !isSignedIn) return null;
 
-  // ✅ FIX: one shared trigger style so both dropdown “bars” are identical
   const triggerClass =
     "h-11 w-full rounded-md border bg-background px-3 text-sm " +
     "focus:outline-none focus:ring-0 focus:ring-offset-0 " +
@@ -111,7 +113,6 @@ export default function Dashboard({
     <div className="space-y-4">
       {tab === "individual challenges" ? (
         <div className="w-full">
-          {/* Selector row */}
           <div
             className="
               grid
@@ -120,9 +121,7 @@ export default function Dashboard({
               gap-6
             "
           >
-            {/* LEFT: stacked selects */}
             <div>
-              {/* Team */}
               <div className="mb-3">
                 <div className="mb-2 text-center text-xs font-semibold tracking-wide text-muted-foreground">
                   Team:
@@ -184,7 +183,7 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* spacer column (this is what pushes avatar ~¾ right) */}
+            {/* spacer column*/}
             <div/>
 
             {/* AVATAR */}
@@ -218,7 +217,7 @@ export default function Dashboard({
         </TabsContent>
 
         <TabsContent value="team challenges">
-          <TeamChallenges initialStats={teamStats} />
+          <TeamChallenges initialStats={teamStats} teamProgress={teamProgress ?? null} />
         </TabsContent>
       </Tabs>
     </div>

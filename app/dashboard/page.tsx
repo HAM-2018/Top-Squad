@@ -4,6 +4,7 @@ import Dashboard from "./dashboard";
 import { getTeamChallengeStats } from "@/db/queries/getTeamChallengeStats";
 import { getSoloChallengeOptions } from "@/db/queries/getSoloChallengeOptions";
 import { getTeams } from "@/db/queries/getTeams";
+import { getTeamChallengeProgressDaily } from "@/db/queries/getTeamChallengeProgressDaily";
 
 export default async function DashboardPage({
   searchParams,
@@ -52,6 +53,7 @@ export default async function DashboardPage({
     : null;
 
   const teamStats = await getTeamChallengeStats();
+  const teamProgress = await getTeamChallengeProgressDaily();
 
   return (
     <Dashboard
@@ -61,6 +63,7 @@ export default async function DashboardPage({
       soloStats={soloStats}
       selectedSoloTeamChallengeId={selectedSoloTeamChallengeId}
       teamStats={teamStats}
+      teamProgress={teamProgress}
     />
   );
 }

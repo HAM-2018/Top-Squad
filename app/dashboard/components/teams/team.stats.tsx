@@ -17,69 +17,113 @@ import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import TeamStatsGraph from "./team.stats.graph";
 import TeamLineGraph from "./team.stats.line.graph";
+import { TeamProgress } from "@/types/lineGraphStats";
+
+type ProgressPoint = {
+  t: string;
+  [key: string]: number | string | null;
+};
 
 export default function TeamChallenges({
   initialStats,
+  teamProgress,
 }: {
   initialStats: TeamChallengeStats | null;
+  teamProgress?: TeamProgress | null;
 }) {
-  
-  const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
-  const hasMultipleParts = parts.length > 1;
   const [selected, setSelected] = useState<string>("overall");
 
-  if (!initialStats) {
-    return (
-      <div className="text-muted-foreground">
-        No team challenge data available yet.
-      </div>
-    );
-  }
+  //  hooks must run
+  const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
+  const hasMultipleParts = parts.length > 1;
 
-  // selected part logic
-  const selectedPart =
-    selected === "overall"
-      ? null
-      : parts.find((p) => String(p.partId) === selected) ?? null;
+  //  selected part 
+  const selectedPart = useMemo(() => {
+    if (selected === "overall") return null;
+    return parts.find((p) => String(p.partId) === selected) ?? null;
+  }, [selected, parts]);
+  
 
   const isOverall = selected === "overall";
+  // teams for avatars
+  const teams = useMemo(() => {
+    if (!initialStats) return [];
+    return isOverall ? initialStats.overall.teams : selectedPart?.teams ?? [];
+  }, [initialStats, isOverall, selectedPart]);
 
-  // graph logic
-
+  // bar chart data (null-safe)
   const graphRows = useMemo(() => {
-  if (isOverall) {
-    return initialStats.overall.chartRows.map((r) => ({
+    if (!initialStats) return [];
+
+    if (isOverall) {
+      return initialStats.overall.chartRows.map((r) => ({
+        name: r.name,
+        value: r.time,
+        isMyTeam: r.isMyTeam,
+      }));
+    }
+
+    if (!selectedPart) return [];
+
+    return selectedPart.chartRows.map((r) => ({
       name: r.name,
       value: r.time,
       isMyTeam: r.isMyTeam,
     }));
-  }
-
-  if (!selectedPart) return [];
-
-  return selectedPart.chartRows.map((r) => ({
-    name: r.name,
-    value: r.time,
-    isMyTeam: r.isMyTeam,
-  }));
-}, [initialStats, isOverall, selectedPart]);
+  }, [initialStats, isOverall, selectedPart]);
 
   const graphMetric = isOverall ? "reps" : selectedPart?.metric ?? "reps";
   const graphUnit = isOverall ? null : selectedPart?.unit ?? null;
+
+  //  line graph logic
+  const linePoints = useMemo(() => {
+    if (!teamProgress) return [];
+
+    if (selected === "overall") return teamProgress.overall;
+
+    // TeamProgress.parts Record<string, TeamProgressPoint[]>
+    return teamProgress.parts[selected] ?? [];
+  }, [teamProgress, selected]);
+
+  // line chart rows always includes t values can be null
+  const lineData = useMemo(() => {
+    return linePoints.map((p) => {
+      const row: Record<string, number | string | null> = { t: p.t };
+
+      for (const [teamId, val] of Object.entries(p.values)) {
+        row[`team_${teamId}`] = val;
+      }
+
+      return row as { t: string } & Record<string, number | string | null>;
+    });
+  }, [linePoints]);
+
+  const teamKeys = useMemo(() => {
+    return (teamProgress?.teams ?? []).map((t) => ({
+      key: `team_${t.teamId}`,
+      name: t.name,
+      isMyTeam: t.isMyTeam,
+    }));
+  }, [teamProgress]);
+
+  // y-axis reversal only time should be reversed 
+  const reversed = !isOverall && selectedPart?.metric === "time";
+
+  if (!initialStats) {
+    return <div className="text-muted-foreground">No team challenge data available yet.</div>;
+  }
 
   // TEAM RANK / TOTAL TEAMS
   const myRank = isOverall
     ? initialStats.overall.myTeamRank
     : selectedPart?.myTeamRank ?? null;
 
-  // LABEL
   const label = isOverall
     ? "Overall"
     : selectedPart
     ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
     : "—";
 
-  // VALUE
   const value = isOverall
     ? initialStats.overall.myTeamPoints !== null
       ? `${initialStats.overall.myTeamPoints} pts`
@@ -91,10 +135,6 @@ export default function TeamChallenges({
         selectedPart.unit
       )
     : "—";
-
-  const teams = isOverall
-    ? initialStats.overall.teams
-    : selectedPart?.teams ?? [];
 
   const firstPlaceTeam = useMemo(() => {
     const ranked = teams.filter((t) => t.rank !== null) as Array<
@@ -282,7 +322,14 @@ export default function TeamChallenges({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <TeamLineGraph />
+          <TeamLineGraph 
+          data={lineData} 
+          teamKeys={teamKeys} 
+          reversed={reversed} 
+          metric={graphMetric} 
+          unit={graphUnit} 
+          isOverall={isOverall}
+          />
         </CardContent>
       </Card>
     </>
