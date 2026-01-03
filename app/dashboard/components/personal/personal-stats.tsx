@@ -26,35 +26,62 @@ import {
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
-import IndividualChallengeScores from "./individual-challenge-scores";
+import IndividualChallengeScores from "./personal-stats-graph";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
 import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { initialsFromName } from "@/lib/initialsFromName";
+import { SoloProgress } from "@/types/lineGraphStats";
+import TeamLineGraph from "../teams/team.stats.line.graph";
+import { pickTopKeysByLatest } from "@/lib/lineStatsHelper";
 
 export default function IndividualChallenges({
   initialStats,
+  soloProgress,
 }: {
   initialStats: MultiPartChallengeStats | null;
+  soloProgress: SoloProgress | null;
 }) {
-  //treat null as empty state but keep UI
-  const hasData = !!initialStats;
 
-  const parts = initialStats?.parts ?? [];
+  const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
+
+  const hasData = parts.length > 0;
   const hasMultipleParts = parts.length > 1;
 
-  const [selected, setSelected] = useState<string>(() => {
-    if (!hasData) return "";
-    if (!hasMultipleParts) return String(parts[0]?.partId ?? "");
-    return "overall";
-  });
+  // stable default
+  const [selected, setSelected] = useState<string>("overall");
 
-  // if no dataselectedPart is null
+  // selected always valid
+  useEffect(() => {
+    // No data yet
+    if (!hasData) {
+      setSelected("");
+      return;
+    }
+
+    // Multi-part: prefer "overall" unless user already picked a valid part
+    if (hasMultipleParts) {
+      setSelected((prev) => {
+        if (prev === "overall") return prev;
+        const stillValid = parts.some((p) => String(p.partId) === prev);
+        return stillValid ? prev : "overall";
+      });
+      return;
+    }
+
+    // Single-part: force selection to that partId
+    setSelected(String(parts[0]?.partId ?? ""));
+  }, [hasData, hasMultipleParts, parts]);
+
+  // Resolve selected part
   const selectedPart = useMemo(() => {
     if (!hasData) return null;
+
     if (hasMultipleParts) {
+      if (selected === "overall") return null;
       return parts.find((p) => String(p.partId) === selected) ?? null;
     }
+
     return parts[0] ?? null;
   }, [hasData, hasMultipleParts, parts, selected]);
 
@@ -101,13 +128,65 @@ export default function IndividualChallenges({
       : selectedPart?.chartRows ?? []
     : [];
 
+  const user = soloProgress?.users?.find((u) => u.isMe)?.userId ?? null;
+
   const chartData = chartRows.map((r) => ({
     ...r,
     value: r.time,
+    isMe: user !== null && r.userId === user,
   }));
 
-  const metric = hasData ? (isOverall ? "reps" : selectedPart?.metric ?? "time") : "time";
+  const metric = hasData
+    ? isOverall
+      ? "reps"
+      : selectedPart?.metric ?? "time"
+    : "time";
+
   const unit = hasData ? (isOverall ? null : selectedPart?.unit ?? null) : null;
+
+  const reversed = !isOverall && selectedPart?.metric === "time";
+
+  //Line graph logic
+  const linePoints = useMemo(() => {
+    if (!soloProgress) return [];
+    if (!selected) return []; // guard for empty selection
+    if (isOverall) return soloProgress.overall;
+    return soloProgress.parts[selected] ?? [];
+  }, [soloProgress, isOverall, selected]);
+
+  const lineData = useMemo(() => {
+    return linePoints.map((p) => {
+      const row: Record<string, number | string | null> = { t: p.t };
+
+      for (const [userId, val] of Object.entries(p.values)) {
+        row[`user_${userId}`] = val;
+      }
+
+      return row as { t: string } & Record<string, number | string | null>;
+    });
+  }, [linePoints]);
+
+  const userKeys = useMemo(() => {
+    return (soloProgress?.users ?? []).map((u) => ({
+      key: `user_${u.userId}`,
+      name: u.name,
+      isMyTeam: u.isMe,
+    }));
+  }, [soloProgress]);
+
+  const latestPoint = linePoints.length ? linePoints[linePoints.length - 1] : null;
+
+  const limitedKeys = useMemo(() => {
+    return pickTopKeysByLatest({
+      keys: userKeys,  
+      latestPoint,
+      isOverall,
+      metric: metric,
+      limit: 6,
+    });
+  }, [userKeys, latestPoint, isOverall, metric]);
+
+
 
   return (
     <>
@@ -320,6 +399,25 @@ export default function IndividualChallenges({
           )}
         </CardContent>
       </Card>
+      <Card className="my-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TimerIcon />
+            <span>Progress over time</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TeamLineGraph
+            data={lineData}
+            teamKeys={limitedKeys}
+            reversed={reversed}
+            metric={metric}
+            unit={unit}
+            isOverall={isOverall}
+          />
+        </CardContent>
+      </Card>
+
     </>
   );
 }

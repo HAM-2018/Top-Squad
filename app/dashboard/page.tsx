@@ -5,6 +5,7 @@ import { getTeamChallengeStats } from "@/db/queries/getTeamChallengeStats";
 import { getSoloChallengeOptions } from "@/db/queries/getSoloChallengeOptions";
 import { getTeams } from "@/db/queries/getTeams";
 import { getTeamChallengeProgressDaily } from "@/db/queries/getTeamChallengeProgressDaily";
+import { getSoloChallengeProgressDaily } from "@/db/queries/getSoloChallengeProgressDaily";
 
 export default async function DashboardPage({
   searchParams,
@@ -22,13 +23,13 @@ export default async function DashboardPage({
   const soloIdFromUrl = soloParam ? Number(soloParam) : undefined;
   const teamIdFromUrl = teamParam ? Number(teamParam) : undefined;
 
-  // picks current solo's option
+  // picks current solo option
   const soloFromUrl =
     Number.isFinite(soloIdFromUrl) && soloIdFromUrl
       ? soloOptions.find((o) => o.teamChallengeId === soloIdFromUrl) ?? null
       : null;
 
-  const latestSolo = soloOptions[0] ?? null; // already ordered by recordedAt desc
+  const latestSolo = soloOptions[0] ?? null;
   const currentSolo = soloFromUrl ?? latestSolo;
 
   // team defaults to team param, or currentSolo
@@ -52,6 +53,9 @@ export default async function DashboardPage({
     ? await getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId })
     : null;
 
+  const soloProgress = selectedSoloTeamChallengeId 
+  ? await getSoloChallengeProgressDaily(selectedSoloTeamChallengeId) : null; 
+
   const teamStats = await getTeamChallengeStats();
   const teamProgress = await getTeamChallengeProgressDaily();
 
@@ -61,6 +65,7 @@ export default async function DashboardPage({
       selectedTeamId={selectedTeamId}
       soloOptions={soloOptions}
       soloStats={soloStats}
+      soloProgress={soloProgress}
       selectedSoloTeamChallengeId={selectedSoloTeamChallengeId}
       teamStats={teamStats}
       teamProgress={teamProgress}

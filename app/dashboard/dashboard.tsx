@@ -20,10 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TeamProgress } from "@/types/lineGraphStats";
+import { SoloProgress, TeamProgress } from "@/types/lineGraphStats";
 
 export default function Dashboard({
   soloStats,
+  soloProgress,
   soloOptions,
   selectedSoloTeamChallengeId,
   teams,
@@ -32,6 +33,7 @@ export default function Dashboard({
   teamProgress,
 }: {
   soloStats: MultiPartChallengeStats | null;
+  soloProgress: SoloProgress | null;
   soloOptions: SoloChallengeOption[];
   selectedSoloTeamChallengeId: number | null;
 
@@ -213,7 +215,7 @@ export default function Dashboard({
         </TabsList>
 
         <TabsContent value="individual challenges">
-          <IndividualChallenges initialStats={soloStats} />
+          <IndividualChallenges initialStats={soloStats} soloProgress={soloProgress} />
         </TabsContent>
 
         <TabsContent value="team challenges">

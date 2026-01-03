@@ -6,6 +6,7 @@ import { formatScore } from "@/lib/formatScore";
 type ChartRow = {
   name: string;
   value: number;
+  isMe?: boolean;
 };
 
 
@@ -55,7 +56,7 @@ export default function IndividualChallengeScores({
               {rows.map((entry, index) => (
                 <Cell
                 key={`cell-${index}`}
-                fill={entry!.name === "You" ? "#22c55e" : "#f43f5e"} />
+                fill={entry!.isMe ? "#22c55e" : "#f43f5e"} />
               ))}
             </Bar>
           </BarChart>
