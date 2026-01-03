@@ -54,10 +54,7 @@ export default function IndividualChallenges({
   // selected always valid
   useEffect(() => {
     // No data yet
-    if (!hasData) {
-      setSelected("");
-      return;
-    }
+    if (!hasData) return;
 
     // Multi-part: prefer "overall" unless user already picked a valid part
     if (hasMultipleParts) {
@@ -70,7 +67,10 @@ export default function IndividualChallenges({
     }
 
     // Single-part: force selection to that partId
-    setSelected(String(parts[0]?.partId ?? ""));
+    setSelected((prev) => {
+      const only = String(parts[0]?.partId ?? "");
+      return prev === only ? prev : only;
+    });
   }, [hasData, hasMultipleParts, parts]);
 
   // Resolve selected part
