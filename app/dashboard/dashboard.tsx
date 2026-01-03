@@ -59,9 +59,14 @@ export default function Dashboard({
     return teams.find((t) => t.id === selectedTeamId) ?? null;
   }, [teams, selectedTeamId]);
 
-  useEffect(() => {
-    setImage(true);
-  }, [selectedTeam?.avatarUrl]);
+  const avatarSrc = selectedTeam?.avatarUrl ?? null;
+
+  // if the avatar URL changes, force image back on
+  const [lastSrc, setLastSrc] = useState<string | null>(avatarSrc);
+  if (lastSrc !== avatarSrc) {
+    setLastSrc(avatarSrc);
+    if (!image) setImage(true);
+  }
 
   // SOLO options
   const soloOptionsForTeam = useMemo(() => {
