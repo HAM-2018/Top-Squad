@@ -49,29 +49,12 @@ export default function IndividualChallenges({
   const hasMultipleParts = parts.length > 1;
 
   // stable default
-  const [selected, setSelected] = useState<string>("overall");
-
-  // selected always valid
-  useEffect(() => {
-    // No data yet
-    if (!hasData) return;
-
-    // Multi-part: prefer "overall" unless user already picked a valid part
-    if (hasMultipleParts) {
-      setSelected((prev) => {
-        if (prev === "overall") return prev;
-        const stillValid = parts.some((p) => String(p.partId) === prev);
-        return stillValid ? prev : "overall";
-      });
-      return;
-    }
-
-    // Single-part: force selection to that partId
-    setSelected((prev) => {
-      const only = String(parts[0]?.partId ?? "");
-      return prev === only ? prev : only;
-    });
-  }, [hasData, hasMultipleParts, parts]);
+  const [selected, setSelected] = useState<string>(() => {
+    const parts = initialStats?.parts ?? [];
+    if (parts.length === 0) return "";
+    if (parts.length === 1) return String(parts[0]?.partId ?? "");
+    return "overall";
+  });
 
   // Resolve selected part
   const selectedPart = useMemo(() => {
@@ -186,8 +169,6 @@ export default function IndividualChallenges({
     });
   }, [userKeys, latestPoint, isOverall, metric]);
 
-
-
   return (
     <>
       <div className="grid lg:grid-cols-3 gap-4">
@@ -200,7 +181,19 @@ export default function IndividualChallenges({
           </CardHeader>
 
           <CardContent className="flex flex-col gap-3 pt-0">
-            <Select value={selected} onValueChange={setSelected} disabled={!hasData}>
+            <Select
+              value={
+                !hasData
+                  ? ""
+                  : hasMultipleParts
+                  ? (selected === "overall" || parts.some((p) => String(p.partId) === selected)
+                      ? selected
+                      : "overall")
+                  : String(parts[0]?.partId ?? "")
+              }
+              onValueChange={setSelected}
+              disabled={!hasData}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue
                   placeholder={hasData ? "Select event" : "No events yet"}
