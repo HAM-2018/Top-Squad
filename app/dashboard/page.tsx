@@ -1,63 +1,95 @@
-
-import { getSoloChallengeStats } from "@/db/queries/getSoloChallengeStats";
 import Dashboard from "./dashboard";
-import { getTeamChallengeStats } from "@/db/queries/getTeamChallengeStats";
-import { getSoloChallengeOptions } from "@/db/queries/getSoloChallengeOptions";
 import { getTeams } from "@/db/queries/getTeams";
-import { getTeamChallengeProgressDaily } from "@/db/queries/getTeamChallengeProgressDaily";
+import { getSoloChallengeOptions } from "@/db/queries/getSoloChallengeOptions";
+import { getTeamChallengeOptions } from "@/db/queries/getTeamChallengeOptions";
+import { getSoloChallengeStats } from "@/db/queries/getSoloChallengeStats";
 import { getSoloChallengeProgressDaily } from "@/db/queries/getSoloChallengeProgressDaily";
+import { getTeamChallengeStats } from "@/db/queries/getTeamChallengeStats";
+import { getTeamChallengeProgressDaily } from "@/db/queries/getTeamChallengeProgressDaily";
+
+type SearchParams = {
+  solo?: string | string[];
+  team?: string | string[];
+  teamChallenge?: string | string[];
+};
+
+function firstParam(v?: string | string[]) {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+function toPositiveInt(v?: string | null) {
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function pickCurrentOptionForTeam<T extends { teamChallengeId: number; teamId: number }>(
+  options: T[],
+  teamId: number | null,
+  idFromUrl: number | null
+) {
+  const optionsForTeam = teamId ? options.filter((o) => o.teamId === teamId) : [];
+
+  const fromUrl =
+    idFromUrl !== null
+      ? optionsForTeam.find((o) => o.teamChallengeId === idFromUrl) ?? null
+      : null;
+
+  const latestForTeam = optionsForTeam[0] ?? null;
+  return { current: fromUrl ?? latestForTeam, optionsForTeam };
+}
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ solo?: string | string[]; team?: string | string[] }>;
+  searchParams?: Promise<SearchParams>;
 }) {
   const sp = (await searchParams) ?? {};
 
-  const [teams, soloOptions] = await Promise.all([getTeams(), getSoloChallengeOptions()]);
+  const soloIdFromUrl = toPositiveInt(firstParam(sp.solo));
+  const teamIdFromUrl = toPositiveInt(firstParam(sp.team));
+  const teamChallengeIdFromUrl = toPositiveInt(firstParam(sp.teamChallenge));
 
-  // normalize params
-  const soloParam = Array.isArray(sp.solo) ? sp.solo[0] : sp.solo;
-  const teamParam = Array.isArray(sp.team) ? sp.team[0] : sp.team;
+  const [teams, soloOptions, teamOptions] = await Promise.all([
+    getTeams(),
+    getSoloChallengeOptions(),
+    getTeamChallengeOptions(),
+  ]);
 
-  const soloIdFromUrl = soloParam ? Number(soloParam) : undefined;
-  const teamIdFromUrl = teamParam ? Number(teamParam) : undefined;
+  // pick base team
+  const latestSoloOverall = soloOptions[0] ?? null;
+  const selectedTeamId = teamIdFromUrl ?? latestSoloOverall?.teamId ?? teams[0]?.id ?? null;
 
-  // picks current solo option
-  const soloFromUrl =
-    Number.isFinite(soloIdFromUrl) && soloIdFromUrl
-      ? soloOptions.find((o) => o.teamChallengeId === soloIdFromUrl) ?? null
-      : null;
+  // SOLO selection (scoped to team)
+  const { current: currentSolo, optionsForTeam: soloOptionsForTeam } =
+    pickCurrentOptionForTeam(soloOptions, selectedTeamId, soloIdFromUrl);
 
-  const latestSolo = soloOptions[0] ?? null;
-  const currentSolo = soloFromUrl ?? latestSolo;
+  const selectedSoloTeamChallengeId = currentSolo?.teamChallengeId ?? null;
 
-  // team defaults to team param, or currentSolo
-  const selectedTeamId =
-    (Number.isFinite(teamIdFromUrl) && (teamIdFromUrl ?? 0) > 0 ? teamIdFromUrl : null) ??
-    currentSolo?.teamId ??
-    teams[0]?.id ??
-    null;
+  // TEAM-CHALLENGE selection (scoped to team)
+  const { current: currentTeamChallenge, optionsForTeam: teamOptionsForTeam } =
+    pickCurrentOptionForTeam(teamOptions, selectedTeamId, teamChallengeIdFromUrl);
 
-  // solo selection must be within selected team
-  const soloOptionsForTeam = selectedTeamId
-    ? soloOptions.filter((o) => o.teamId === selectedTeamId)
-    : [];
+  const selectedTeamTeamChallengeId = currentTeamChallenge?.teamChallengeId ?? null;
 
-  const selectedSoloTeamChallengeId =
-    currentSolo && currentSolo.teamId === selectedTeamId
-      ? currentSolo.teamChallengeId
-      : soloOptionsForTeam[0]?.teamChallengeId ?? null; // newest for that team
+  // fetch stats/progress
+  const [soloStats, soloProgress, teamStats, teamProgress] = await Promise.all([
+    selectedSoloTeamChallengeId
+      ? getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId })
+      : Promise.resolve(null),
 
-  const soloStats = selectedSoloTeamChallengeId
-    ? await getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId })
-    : null;
+    selectedSoloTeamChallengeId
+      ? getSoloChallengeProgressDaily(selectedSoloTeamChallengeId)
+      : Promise.resolve(null),
 
-  const soloProgress = selectedSoloTeamChallengeId 
-  ? await getSoloChallengeProgressDaily(selectedSoloTeamChallengeId) : null; 
+    selectedTeamTeamChallengeId
+      ? getTeamChallengeStats({ teamChallengeId: selectedTeamTeamChallengeId })
+      : Promise.resolve(null),
 
-  const teamStats = await getTeamChallengeStats();
-  const teamProgress = await getTeamChallengeProgressDaily();
+    selectedTeamTeamChallengeId
+      ? getTeamChallengeProgressDaily(selectedTeamTeamChallengeId)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <Dashboard
@@ -69,6 +101,8 @@ export default async function DashboardPage({
       selectedSoloTeamChallengeId={selectedSoloTeamChallengeId}
       teamStats={teamStats}
       teamProgress={teamProgress}
+      teamOptions={teamOptions}
+      selectedTeamChallengeId={selectedTeamTeamChallengeId}
     />
   );
 }

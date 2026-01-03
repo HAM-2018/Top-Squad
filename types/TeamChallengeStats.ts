@@ -1,3 +1,5 @@
+export type TeamMetric = "time" | "distance" | "reps" | "weight";
+
 export type TeamChartRow = {
   teamId: number;
   name: string;
@@ -6,7 +8,7 @@ export type TeamChartRow = {
   isMyTeam: boolean;
 };
 
-export type PartTeamRow = {
+export type TeamRow = {
   teamId: number;
   teamName: string;
   avatarUrl: string | null;
@@ -15,26 +17,28 @@ export type PartTeamRow = {
   isMyTeam: boolean;
 };
 
-export type TeamPartStats = {
-  partId: number;
-  partName: string;
-  metric: "time" | "distance" | "reps" | "weight";
-  unit: string | null;
-  isTeamLogOnly: boolean;
-  myTeamRank: number | null;
-  myTeamValue: number | null;
-  totalTeams: number;
-  chartRows: TeamChartRow[];
-  teams: PartTeamRow[];
-};
-
 export type OverallTeamRow = {
   teamId: number;
   teamName: string;
   avatarUrl: string | null;
-  rank: number;
-  points: number;
+  rank: number; 
+  points: number;     
   isMyTeam: boolean;
+};
+
+export type TeamPartStats = {
+  partId: number;
+  partName: string;
+  metric: TeamMetric; 
+  unit: string | null;
+  isTeamLogOnly: boolean;
+
+  myTeamRank: number | null;
+  myTeamValue: number | null;
+  totalTeams: number;
+
+  teams: TeamRow[];
+  chartRows: TeamChartRow[];
 };
 
 export type TeamChallengeStats = {

@@ -102,7 +102,7 @@ export default function TeamChallenges({
   }, [teamProgress]);
 
   // y-axis reversal only time should be reversed 
-  const reversed = !isOverall && selectedPart?.metric === "time";
+  const reversed = isOverall || selectedPart?.metric === "time";
 
   const firstPlaceTeam = useMemo(() => {
     const ranked = teams.filter((t) => t.rank !== null) as Array<

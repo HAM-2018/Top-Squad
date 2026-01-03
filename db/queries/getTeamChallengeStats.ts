@@ -11,7 +11,11 @@ import {
 } from "@/db/schema";
 import { and, asc, desc, eq, inArray, min, max } from "drizzle-orm";
 
-export async function getTeamChallengeStats() {
+export async function getTeamChallengeStats({
+  teamChallengeId,
+}: {
+  teamChallengeId: number;
+}) {
   const { userId: clerkId } = await auth();
   if (!clerkId) throw new Error("Unauthorized");
 
@@ -21,16 +25,7 @@ export async function getTeamChallengeStats() {
     .where(eq(usersTable.clerkId, clerkId));
   if (!me) throw new Error("User not found");
 
-  const [myTeam] = await db
-    .select({ teamId: teamMembersTable.teamId })
-    .from(teamMembersTable)
-    .where(eq(teamMembersTable.userId, me.id))
-    .orderBy(desc(teamMembersTable.joinedAt))
-    .limit(1);
-
-  if (!myTeam) return null;
-
-  const [challenge] = await db
+  const [selected] = await db
     .select({
       challengeId: teamChallengesTable.challengeId,
       challengeName: challengeTable.name,
@@ -38,11 +33,17 @@ export async function getTeamChallengeStats() {
     })
     .from(teamChallengesTable)
     .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
-    .where(and(eq(teamChallengesTable.teamId, myTeam.teamId), eq(challengeTable.isTeamBased, true)))
-    .orderBy(desc(teamChallengesTable.createdAt))
+    .innerJoin(
+      teamMembersTable,
+      and(
+        eq(teamMembersTable.teamId, teamChallengesTable.teamId),
+        eq(teamMembersTable.userId, me.id)
+      )
+    )
+    .where(and(eq(teamChallengesTable.id, teamChallengeId), eq(challengeTable.isTeamBased, true)))
     .limit(1);
 
-  if (!challenge) return null;
+  if (!selected) return null;
 
   // all teams participating in this challenge
   const teamChallenges = await db
@@ -54,7 +55,7 @@ export async function getTeamChallengeStats() {
     })
     .from(teamChallengesTable)
     .innerJoin(teamsTable, eq(teamsTable.id, teamChallengesTable.teamId))
-    .where(eq(teamChallengesTable.challengeId, challenge.challengeId));
+    .where(eq(teamChallengesTable.challengeId, selected.challengeId));
 
   const teamChallengeIds = teamChallenges.map((t) => t.teamChallengeId);
 
@@ -74,18 +75,44 @@ export async function getTeamChallengeStats() {
       isTeamLogOnly: challengePartsTable.isTeamLogOnly,
     })
     .from(challengePartsTable)
-    .where(eq(challengePartsTable.challengeId, challenge.challengeId))
+    .where(eq(challengePartsTable.challengeId, selected.challengeId))
     .orderBy(asc(challengePartsTable.sortOrder));
 
   // seed ALL teams so overall includes everyone even with no attempts
   const pointsByTeam = new Map<number, number>();
   for (const t of teamChallenges) pointsByTeam.set(t.teamId, 0);
 
-  const partStats: any[] = [];
+  const partStats: Array<{
+    partId: number;
+    partName: string;
+    metric: "time" | "distance" | "reps" | "weight";
+    unit: string | null;
+    isTeamLogOnly: boolean;
+    myTeamRank: number | null;
+    myTeamValue: number | null;
+    totalTeams: number;
+    teams: Array<{
+      teamId: number;
+      teamName: string;
+      avatarUrl: string | null;
+      rank: number | null;
+      value: number | null;
+      isMyTeam: boolean;
+    }>;
+    chartRows: Array<{
+      teamId: number;
+      name: string;
+      avatarUrl: string | null;
+      time: number;
+      isMyTeam: boolean;
+    }>;
+  }> = [];
 
   for (const part of parts) {
     const isTime = part.metric === "time";
-    const bestExpr = isTime ? min(challengeAttemptsTable.value) : max(challengeAttemptsTable.value);
+    const bestExpr = isTime
+      ? min(challengeAttemptsTable.value)
+      : max(challengeAttemptsTable.value);
 
     const perUserBest = await db
       .select({
@@ -94,7 +121,10 @@ export async function getTeamChallengeStats() {
         bestValue: bestExpr,
       })
       .from(challengeAttemptsTable)
-      .innerJoin(teamChallengesTable, eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId))
+      .innerJoin(
+        teamChallengesTable,
+        eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId)
+      )
       .where(
         and(
           inArray(challengeAttemptsTable.teamChallengeId, teamChallengeIds),
@@ -114,21 +144,13 @@ export async function getTeamChallengeStats() {
       const v = Number(row.bestValue);
 
       if (part.isTeamLogOnly) {
-        // one team value (min for time, max otherwise)
         const cur = teamTotals.get(teamId);
-        if (cur === undefined) {
-          teamTotals.set(teamId, v);
-        } else {
-          teamTotals.set(teamId, isTime ? Math.min(cur, v) : Math.max(cur, v));
-        }
+        if (cur === undefined) teamTotals.set(teamId, v);
+        else teamTotals.set(teamId, isTime ? Math.min(cur, v) : Math.max(cur, v));
       } else {
         // time = average of member bests, others = sum
-        if (isTime) {
-          teamTotals.set(teamId, (teamTotals.get(teamId) ?? 0) + v);
-          teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1);
-        } else {
-          teamTotals.set(teamId, (teamTotals.get(teamId) ?? 0) + v);
-        }
+        teamTotals.set(teamId, (teamTotals.get(teamId) ?? 0) + v);
+        if (isTime) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1);
       }
     }
 
@@ -140,7 +162,7 @@ export async function getTeamChallengeStats() {
       }
     }
 
-    //  build leaderboard from ALL participating teams (null total if no attempts)
+    // leaderboard from ALL teams (null if no attempts)
     const leaderboard = teamChallenges
       .map((tc) => {
         const meta = teamMeta.get(tc.teamId);
@@ -148,20 +170,17 @@ export async function getTeamChallengeStats() {
           teamId: tc.teamId,
           name: meta?.name ?? `Team ${tc.teamId}`,
           avatarUrl: meta?.avatarUrl ?? null,
-          total: teamTotals.get(tc.teamId) ?? null as number | null,
-          isMyTeam: tc.teamId === challenge.myTeamId,
+          total: (teamTotals.get(tc.teamId) ?? null) as number | null,
+          isMyTeam: tc.teamId === selected.myTeamId,
         };
       })
       .sort((a, b) => {
-        // nulls go to bottom
         if (a.total === null && b.total === null) return 0;
         if (a.total === null) return 1;
         if (b.total === null) return -1;
-
         return isTime ? a.total - b.total : b.total - a.total;
       });
 
-    // rank only among teams that actually have a score
     const scored = leaderboard.filter((t) => t.total !== null) as Array<
       Omit<(typeof leaderboard)[number], "total"> & { total: number }
     >;
@@ -169,11 +188,12 @@ export async function getTeamChallengeStats() {
     const rankByTeam = new Map<number, number>();
     scored.forEach((t, idx) => rankByTeam.set(t.teamId, idx + 1));
 
-    const myRow = leaderboard.find((t) => t.teamId === challenge.myTeamId) ?? null;
+    const myRow = leaderboard.find((t) => t.teamId === selected.myTeamId) ?? null;
     const myTeamValue = myRow?.total ?? null;
-    const myTeamRank = myRow?.total === null ? null : (rankByTeam.get(challenge.myTeamId) ?? null);
+    const myTeamRank =
+      myRow?.total === null ? null : (rankByTeam.get(selected.myTeamId) ?? null);
 
-    // only award points to scored teams; keep seeded zeros for the rest
+    // award points only to scored teams
     scored.forEach((t, idx) => {
       pointsByTeam.set(t.teamId, (pointsByTeam.get(t.teamId) ?? 0) + (idx + 1));
     });
@@ -188,17 +208,15 @@ export async function getTeamChallengeStats() {
       myTeamValue,
       totalTeams: leaderboard.length,
 
-      // include all teams; rank/value null if no attempts
       teams: leaderboard.map((t) => ({
         teamId: t.teamId,
         teamName: t.name,
         avatarUrl: t.avatarUrl,
         rank: rankByTeam.get(t.teamId) ?? null,
-        value: t.total, // number | null
+        value: t.total,
         isMyTeam: t.isMyTeam,
       })),
 
-      // charts: only show top 10 scored teams (so nulls don't appear)
       chartRows: scored.slice(0, 10).map((t) => ({
         teamId: t.teamId,
         name: t.name,
@@ -218,24 +236,23 @@ export async function getTeamChallengeStats() {
         points,
         name: meta?.name ?? `Team ${teamId}`,
         avatarUrl: meta?.avatarUrl ?? null,
-        isMyTeam: teamId === challenge.myTeamId,
+        isMyTeam: teamId === selected.myTeamId,
       };
     })
     .sort((a, b) => a.points - b.points);
 
-  const myOverallIndex = overallLeaderboard.findIndex((t) => t.teamId === challenge.myTeamId);
+  const myOverallIndex = overallLeaderboard.findIndex((t) => t.teamId === selected.myTeamId);
 
   return {
-    challengeId: challenge.challengeId,
-    challengeName: challenge.challengeName,
-    myTeamId: challenge.myTeamId,
+    challengeId: selected.challengeId,
+    challengeName: selected.challengeName,
+    myTeamId: selected.myTeamId,
     parts: partStats,
     overall: {
       myTeamRank: myOverallIndex >= 0 ? myOverallIndex + 1 : null,
       myTeamPoints: myOverallIndex >= 0 ? overallLeaderboard[myOverallIndex].points : null,
       totalTeams: overallLeaderboard.length,
 
-      // ✅ include all teams in overall too
       teams: overallLeaderboard.map((t, idx) => ({
         teamId: t.teamId,
         teamName: t.name,
