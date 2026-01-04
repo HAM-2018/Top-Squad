@@ -157,9 +157,12 @@ export default function Dashboard({
   if (!isLoaded || !isSignedIn) return null;
 
   const triggerClass =
-    "h-11 w-full rounded-md border bg-background px-3 text-sm " +
+    "w-full rounded-md border bg-background px-3 " +
+    "h-9 text-xs " +
+    "sm:h-10 sm:text-sm " +
     "focus:outline-none focus:ring-0 focus:ring-offset-0 " +
     "data-[state=open]:ring-0 data-[state=open]:ring-offset-0";
+
 
   const showSoloHeader = tab === "individual challenges";
   const showTeamHeader = tab === "team challenges";
@@ -170,15 +173,17 @@ export default function Dashboard({
         <div
           className="
             grid
-            grid-cols-[520px_1fr_120px]
+            grid-cols-1
+            gap-4
+            md:grid-cols-[520px_1fr_120px]
             items-center
-            gap-6
+            md:gap-6
           "
         >
           <div>
             {/* Team */}
             <div className="mb-3">
-              <div className="mb-2 text-center text-xs font-semibold tracking-wide text-muted-foreground">
+              <div className="mb-1 text-center text-[10px] font-semibold tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">
                 Team:
               </div>
               <Select
@@ -203,9 +208,10 @@ export default function Dashboard({
             </div>
             {showSoloHeader ? (
               <div>
-                <div className="mb-2 text-center text-xs font-semibold tracking-wide text-muted-foreground">
+                <div className="mb-1 text-center text-[10px] font-semibold tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">
                   Challenge:
                 </div>
+
                 <Select
                   value={
                     selectedSoloTeamChallengeId
@@ -271,10 +277,11 @@ export default function Dashboard({
           {/* spacer column */}
           <div />
           {/* Avatar */}
-          <div className="flex justify-center mr-40">
-            <Avatar className="h-35 w-35 border bg-background">
+          <div className="flex justify-center md:mr-40">
+            <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-35 md:w-35 border bg-background">
               {selectedTeam?.avatarUrl && image ? (
                 <AvatarImage
+                  key={selectedTeam.avatarUrl}
                   src={selectedTeam.avatarUrl}
                   alt={selectedTeam.name ?? "Team"}
                   className="object-cover"
@@ -282,7 +289,7 @@ export default function Dashboard({
                 />
               ) : null}
 
-              <AvatarFallback className="text-4xl font-semibold">
+              <AvatarFallback className="text-foreground text-xl sm:text-2xl md:text-4xl font-semibold">
                 {initialsFromName(selectedTeam?.name ?? "Team")}
               </AvatarFallback>
             </Avatar>
