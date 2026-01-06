@@ -6,6 +6,7 @@ import { getSoloChallengeStats } from "@/db/queries/getSoloChallengeStats";
 import { getSoloChallengeProgressDaily } from "@/db/queries/getSoloChallengeProgressDaily";
 import { getTeamChallengeStats } from "@/db/queries/getTeamChallengeStats";
 import { getTeamChallengeProgressDaily } from "@/db/queries/getTeamChallengeProgressDaily";
+import { getCurrentUser } from "@/db/queries/getCurrentUser";
 
 type SearchParams = {
   solo?: string | string[];
@@ -44,6 +45,8 @@ export default async function DashboardPage({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
+  await getCurrentUser();
+
   const sp = (await searchParams) ?? {};
 
   const soloIdFromUrl = toPositiveInt(firstParam(sp.solo));

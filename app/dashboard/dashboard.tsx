@@ -3,7 +3,6 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import IndividualChallenges from "./components/personal/personal-stats";
 import TeamChallenges from "./components/teams/team.stats";
-import { createOrUpdateUser } from "@/db/mutations/createUser";
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -137,22 +136,6 @@ export default function Dashboard({
   const onTeamChallengeChange = (teamChallengeId: number) => {
     pushParams({ teamChallenge: teamChallengeId });
   };
-
-  // user sync
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || !user) return;
-
-    void createOrUpdateUser({
-      clerkId: user.id,
-      email:
-        user.primaryEmailAddress?.emailAddress ??
-        user.emailAddresses[0]?.emailAddress ??
-        "",
-      firstName: user.firstName,
-      lastName: user.lastName,
-      avatarUrl: user.imageUrl,
-    });
-  }, [isLoaded, isSignedIn, user]);
 
   if (!isLoaded || !isSignedIn) return null;
 

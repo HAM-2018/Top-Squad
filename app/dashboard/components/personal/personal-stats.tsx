@@ -34,6 +34,7 @@ import { initialsFromName } from "@/lib/initialsFromName";
 import { SoloProgress } from "@/types/lineGraphStats";
 import TeamLineGraph from "../teams/team.stats.line.graph";
 import { pickTopKeysByLatest } from "@/lib/lineStatsHelper";
+import { AvatarImage } from "@radix-ui/react-avatar";
 
 export default function IndividualChallenges({
   initialStats,
@@ -259,10 +260,11 @@ export default function IndividualChallenges({
                     chartRows.slice(1, 6).map((row) => (
                       <Avatar key={row.userId} className="h-14 w-14 shrink-0 border bg-background">
                         {row.avatarUrl ? (
-                          <img
+                          <AvatarImage
                             src={row.avatarUrl}
                             alt={row.name}
                             className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <AvatarFallback className="text-xs font-medium">
@@ -341,10 +343,11 @@ export default function IndividualChallenges({
               <>
                 <Avatar className="h-10 w-10 border bg-background">
                   {chartRows[0].avatarUrl ? (
-                    <img
+                    <AvatarImage
                       src={chartRows[0].avatarUrl}
                       alt={chartRows[0].name}
                       className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <AvatarFallback className="text-xs font-medium">

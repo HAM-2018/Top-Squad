@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { HandshakeIcon, MedalIcon, PartyPopperIcon, StarIcon, TimerIcon } from "lucide-react";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Image from "next/image";
 import { TeamChallengeStats } from "@/types/TeamChallengeStats";
 import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,7 +25,11 @@ export default function TeamChallenges({
   initialStats: TeamChallengeStats | null;
   teamProgress?: TeamProgress | null;
 }) {
-  const [selected, setSelected] = useState<string>("overall");
+  const [selected, setSelected] = useState<string>(
+    initialStats?.parts?.length === 1
+    ? String(initialStats.parts[0].partId)
+    : "overall"
+  );
 
   //  hooks must run
   const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
@@ -223,12 +226,10 @@ export default function TeamChallenges({
                   <TooltipTrigger asChild>
                     <Avatar>
                       {team.avatarUrl ? (
-                        <Image
-                          src={team.avatarUrl}
-                          alt={team.teamName}
-                          width={40}
-                          height={40}
-                          className="rounded-full object-cover"
+                        <AvatarImage
+                        src={team.avatarUrl ?? ""}
+                        alt={team.teamName}
+                        referrerPolicy="no-referrer" 
                         />
                       ) : null}
                       <AvatarFallback className="font-semibold">
@@ -261,12 +262,10 @@ export default function TeamChallenges({
               <>
                 <Avatar>
                   {firstPlaceTeam.avatarUrl ? (
-                    <Image
-                      src={firstPlaceTeam.avatarUrl}
-                      alt={firstPlaceTeam.teamName}
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover"
+                    <AvatarImage
+                    src={firstPlaceTeam.avatarUrl ?? ""}
+                    alt={firstPlaceTeam.teamName}
+                    referrerPolicy="no-referrer" 
                     />
                   ) : null}
                   <AvatarFallback className="font-semibold">
