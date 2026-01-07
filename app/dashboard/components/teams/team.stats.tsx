@@ -228,8 +228,7 @@ export default function TeamChallenges({
                       {team.avatarUrl ? (
                         <AvatarImage
                         src={team.avatarUrl ?? ""}
-                        alt={team.teamName}
-                        referrerPolicy="no-referrer" 
+                        alt={team.teamName} 
                         />
                       ) : null}
                       <AvatarFallback className="font-semibold">
@@ -264,8 +263,7 @@ export default function TeamChallenges({
                   {firstPlaceTeam.avatarUrl ? (
                     <AvatarImage
                     src={firstPlaceTeam.avatarUrl ?? ""}
-                    alt={firstPlaceTeam.teamName}
-                    referrerPolicy="no-referrer" 
+                    alt={firstPlaceTeam.teamName} 
                     />
                   ) : null}
                   <AvatarFallback className="font-semibold">

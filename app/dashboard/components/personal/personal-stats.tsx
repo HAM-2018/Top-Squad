@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,12 +29,11 @@ import Link from "next/link";
 import IndividualChallengeScores from "./personal-stats-graph";
 import { formatScore, metricCapitalize } from "@/lib/formatScore";
 import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { initialsFromName } from "@/lib/initialsFromName";
 import { SoloProgress } from "@/types/lineGraphStats";
 import TeamLineGraph from "../teams/team.stats.line.graph";
 import { pickTopKeysByLatest } from "@/lib/lineStatsHelper";
-import { AvatarImage } from "@radix-ui/react-avatar";
 
 export default function IndividualChallenges({
   initialStats,
@@ -264,7 +263,6 @@ export default function IndividualChallenges({
                             src={row.avatarUrl}
                             alt={row.name}
                             className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <AvatarFallback className="text-xs font-medium">
@@ -347,7 +345,6 @@ export default function IndividualChallenges({
                       src={chartRows[0].avatarUrl}
                       alt={chartRows[0].name}
                       className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <AvatarFallback className="text-xs font-medium">

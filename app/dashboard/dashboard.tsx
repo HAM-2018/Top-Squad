@@ -3,7 +3,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import IndividualChallenges from "./components/personal/personal-stats";
 import TeamChallenges from "./components/teams/team.stats";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
