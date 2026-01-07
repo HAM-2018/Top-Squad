@@ -1,10 +1,12 @@
 import { syncUserAvatar } from "@/db/mutations/syncUserAvatars";
 import { UserProfile } from "@clerk/nextjs";
+import SyncAvatar from "./sync-avatar";
 
 export default async function AccountPage() {
   await syncUserAvatar();
   return (
     <div className="p-4">
+      <SyncAvatar />
       <div className="mb-4">
         <h1 className="text-2xl font-semibold">Account</h1>
         <p className="text-sm text-muted-foreground">
