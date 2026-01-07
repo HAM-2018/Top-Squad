@@ -1,10 +1,10 @@
 name: CD - Build, Push, Deploy (Argo)
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: ["main"]
-    paths-ignore:
-      - "k8s/topsquad/deployment.yaml"
 
 permissions:
   contents: write
@@ -15,16 +15,17 @@ concurrency:
 
 jobs:
   build_push_deploy:
-    # Extra safety: if someone removes paths-ignore, still avoid looping
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(cd):') }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repo at tested commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
+        run: echo "IMAGE_TAG=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
