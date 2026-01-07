@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: topsquad-ingress
+  namespace: topsquad
+  annotations:
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - top-squad.app
+      secretName: topsquad-tls
+  rules:
+    - host: top-squad.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: topsquad-svc
+                port:
+                  number: 80

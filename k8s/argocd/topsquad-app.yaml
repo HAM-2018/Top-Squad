@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: topsquad
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:HAM-2018/Top-Squad.git
+    targetRevision: main
+    path: k8s/topsquad
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: topsquad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
