@@ -55,21 +55,6 @@ export default function Dashboard({
   const tabToUrl = (t: Tab) => (t === "team challenges" ? "team" : "solo");
 
   const [isPending, startTransition] = useTransition();
-  const [showSkeleton, setShowSkeleton] = useState(false);
-
-  useEffect(() => {
-  if (showSkeleton) setShowSkeleton(false);
-}, [
-  activeTab,
-  selectedTeamId,
-  selectedSoloTeamChallengeId,
-  selectedTeamChallengeId,
-  soloStats,
-  soloProgress,
-  teamStats,
-  teamProgress,
-  showSkeleton,
-]);
 
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
@@ -88,12 +73,10 @@ export default function Dashboard({
 
   // if the avatar URL changes
   const [lastSrc, setLastSrc] = useState<string | null>(avatarSrc);
-    useEffect(() => {
-      if (lastSrc !== avatarSrc) {
-        setLastSrc(avatarSrc);
-        setImage(true);
-      }
-    }, [avatarSrc, lastSrc]);
+    if (lastSrc !== avatarSrc) {
+      setLastSrc(avatarSrc);
+      if (!image) setImage(true);
+    }
 
   // SOLO options
   const soloOptionsForTeam = useMemo(() => {
@@ -143,7 +126,6 @@ export default function Dashboard({
     if (next.tab === null) params.delete("tab");
     else if (next.tab) params.set("tab", next.tab);
 
-    setShowSkeleton(true);
     startTransition(() => {
     router.push(`/dashboard?${params.toString()}`);
     })
@@ -329,7 +311,7 @@ export default function Dashboard({
         </TabsList>
 
         <TabsContent value="individual challenges">
-          {showSkeleton || isPending ? (
+          {isPending ? (
             <IndividualChallengesSkeleton />
           ) : (
             <IndividualChallenges initialStats={soloStats} soloProgress={soloProgress} />
@@ -337,7 +319,7 @@ export default function Dashboard({
         </TabsContent>
 
         <TabsContent value="team challenges">
-          {showSkeleton || isPending ? (
+          {isPending ? (
             <TeamChallengesSkeleton />
           ) : (
             <TeamChallenges initialStats={teamStats} teamProgress={teamProgress ?? null} />
