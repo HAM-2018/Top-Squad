@@ -12,6 +12,7 @@ type SearchParams = {
   solo?: string | string[];
   team?: string | string[];
   teamChallenge?: string | string[];
+  tab?: "solo" | "team" | string | string[];
 };
 
 function firstParam(v?: string | string[]) {
@@ -45,6 +46,7 @@ export default async function DashboardPage({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
+
   await getCurrentUser();
 
   const sp = (await searchParams) ?? {};
@@ -53,30 +55,32 @@ export default async function DashboardPage({
   const teamIdFromUrl = toPositiveInt(firstParam(sp.team));
   const teamChallengeIdFromUrl = toPositiveInt(firstParam(sp.teamChallenge));
 
+  // find active tab from URL with default of solo
+  const tab = firstParam(sp.tab);
+  const activeTab: "solo" | "team" = tab === "team" ? "team" : "solo";
+
+  // get teams and solo challenges
   const [teams, soloOptions, teamOptions] = await Promise.all([
     getTeams(),
     getSoloChallengeOptions(),
-    getTeamChallengeOptions(),
+    activeTab === "team" ? getTeamChallengeOptions() : Promise.resolve([]),
   ]);
 
   // pick base team
   const latestSoloOverall = soloOptions[0] ?? null;
-  const selectedTeamId = teamIdFromUrl ?? latestSoloOverall?.teamId ?? teams[0]?.id ?? null;
+  const selectedTeamId =
+    teamIdFromUrl ?? latestSoloOverall?.teamId ?? teams[0]?.id ?? null;
 
-  // SOLO selection (scoped to team)
-  const { current: currentSolo, optionsForTeam: soloOptionsForTeam } =
-    pickCurrentOptionForTeam(soloOptions, selectedTeamId, soloIdFromUrl);
-
+  // SOLO selection 
+  const { current: currentSolo } = pickCurrentOptionForTeam(
+    soloOptions as any[],
+    selectedTeamId,
+    soloIdFromUrl
+  );
   const selectedSoloTeamChallengeId = currentSolo?.teamChallengeId ?? null;
 
-  // TEAM-CHALLENGE selection (scoped to team)
-  const { current: currentTeamChallenge, optionsForTeam: teamOptionsForTeam } =
-    pickCurrentOptionForTeam(teamOptions, selectedTeamId, teamChallengeIdFromUrl);
-
-  const selectedTeamTeamChallengeId = currentTeamChallenge?.teamChallengeId ?? null;
-
-  // fetch stats/progress
-  const [soloStats, soloProgress, teamStats, teamProgress] = await Promise.all([
+  // SOLO stats/progress 
+  const [soloStats, soloProgress] = await Promise.all([
     selectedSoloTeamChallengeId
       ? getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId })
       : Promise.resolve(null),
@@ -84,18 +88,36 @@ export default async function DashboardPage({
     selectedSoloTeamChallengeId
       ? getSoloChallengeProgressDaily(selectedSoloTeamChallengeId)
       : Promise.resolve(null),
-
-    selectedTeamTeamChallengeId
-      ? getTeamChallengeStats({ teamChallengeId: selectedTeamTeamChallengeId })
-      : Promise.resolve(null),
-
-    selectedTeamTeamChallengeId
-      ? getTeamChallengeProgressDaily(selectedTeamTeamChallengeId)
-      : Promise.resolve(null),
   ]);
+
+  // get team stats when tab is set to "team"
+  let selectedTeamTeamChallengeId: number | null = null;
+  let teamStats: any = null;
+  let teamProgress: any = null;
+
+  if (activeTab === "team") {
+    const { current: currentTeamChallenge } = pickCurrentOptionForTeam(
+      teamOptions as any[],
+      selectedTeamId,
+      teamChallengeIdFromUrl
+    );
+
+    selectedTeamTeamChallengeId = currentTeamChallenge?.teamChallengeId ?? null;
+
+    [teamStats, teamProgress] = await Promise.all([
+      selectedTeamTeamChallengeId
+        ? getTeamChallengeStats({ teamChallengeId: selectedTeamTeamChallengeId })
+        : Promise.resolve(null),
+
+      selectedTeamTeamChallengeId
+        ? getTeamChallengeProgressDaily(selectedTeamTeamChallengeId)
+        : Promise.resolve(null),
+    ]);
+  }
 
   return (
     <Dashboard
+      activeTab={activeTab} 
       teams={teams}
       selectedTeamId={selectedTeamId}
       soloOptions={soloOptions}
@@ -104,7 +126,7 @@ export default async function DashboardPage({
       selectedSoloTeamChallengeId={selectedSoloTeamChallengeId}
       teamStats={teamStats}
       teamProgress={teamProgress}
-      teamOptions={teamOptions}
+      teamOptions={teamOptions as any[]}
       selectedTeamChallengeId={selectedTeamTeamChallengeId}
     />
   );

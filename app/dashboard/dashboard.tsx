@@ -3,7 +3,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import IndividualChallenges from "./components/personal/personal-stats";
 import TeamChallenges from "./components/teams/team.stats";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
@@ -21,8 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SoloProgress, TeamProgress } from "@/types/lineGraphStats";
+import TeamChallengesSkeleton from "./components/teams/team.stats.skeleton";
+import IndividualChallengesSkeleton from "./components/personal/personal.stats.skeleton";
 
 export default function Dashboard({
+  activeTab = "solo",
   soloStats,
   soloProgress,
   soloOptions,
@@ -34,6 +37,7 @@ export default function Dashboard({
   teamStats,
   teamProgress,
 }: {
+  activeTab?: "solo" | "team"
   soloStats: MultiPartChallengeStats | null;
   soloProgress: SoloProgress | null;
   soloOptions: SoloChallengeOption[];
@@ -45,12 +49,34 @@ export default function Dashboard({
   teamStats: TeamChallengeStats | null;
   teamProgress: TeamProgress | null;
 }) {
+
+
+  type Tab = "individual challenges" | "team challenges";
+  const tabToUrl = (t: Tab) => (t === "team challenges" ? "team" : "solo");
+
+  const [isPending, startTransition] = useTransition();
+  const [showSkeleton, setShowSkeleton] = useState(false);
+
+  useEffect(() => {
+  if (showSkeleton) setShowSkeleton(false);
+}, [
+  activeTab,
+  selectedTeamId,
+  selectedSoloTeamChallengeId,
+  selectedTeamChallengeId,
+  soloStats,
+  soloProgress,
+  teamStats,
+  teamProgress,
+  showSkeleton,
+]);
+
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const sp = useSearchParams();
 
-  const [tab, setTab] = useState<"individual challenges" | "team challenges">(
-    "individual challenges"
+  const [tab, setTab] = useState<Tab>(() =>
+    activeTab === "team" ? "team challenges" : "individual challenges"
   );
 
   const [image, setImage] = useState(true);
@@ -60,12 +86,14 @@ export default function Dashboard({
 
   const avatarSrc = selectedTeam?.avatarUrl ?? null;
 
-  // if the avatar URL changes, force image back on
+  // if the avatar URL changes
   const [lastSrc, setLastSrc] = useState<string | null>(avatarSrc);
-  if (lastSrc !== avatarSrc) {
-    setLastSrc(avatarSrc);
-    if (!image) setImage(true);
-  }
+    useEffect(() => {
+      if (lastSrc !== avatarSrc) {
+        setLastSrc(avatarSrc);
+        setImage(true);
+      }
+    }, [avatarSrc, lastSrc]);
 
   // SOLO options
   const soloOptionsForTeam = useMemo(() => {
@@ -98,6 +126,7 @@ export default function Dashboard({
     team?: number | null;
     solo?: number | null;
     teamChallenge?: number | null;
+    tab?: "solo" | "team" | null;
   }) => {
     const params = new URLSearchParams(sp.toString());
 
@@ -111,7 +140,13 @@ export default function Dashboard({
     else if (typeof next.teamChallenge === "number")
       params.set("teamChallenge", String(next.teamChallenge));
 
+    if (next.tab === null) params.delete("tab");
+    else if (next.tab) params.set("tab", next.tab);
+
+    setShowSkeleton(true);
+    startTransition(() => {
     router.push(`/dashboard?${params.toString()}`);
+    })
   };
 
   const onTeamChange = (teamId: number) => {
@@ -126,15 +161,16 @@ export default function Dashboard({
       team: teamId,
       solo: firstSoloForTeam,
       teamChallenge: firstTeamChallengeForTeam,
+      tab: tabToUrl(tab)
     });
   };
 
   const onSoloChange = (teamChallengeId: number) => {
-    pushParams({ solo: teamChallengeId });
+    pushParams({ solo: teamChallengeId, tab: "solo" });
   };
 
   const onTeamChallengeChange = (teamChallengeId: number) => {
-    pushParams({ teamChallenge: teamChallengeId });
+    pushParams({ teamChallenge: teamChallengeId, tab: "team" });
   };
 
   if (!isLoaded || !isSignedIn) return null;
@@ -279,20 +315,35 @@ export default function Dashboard({
           </div>
         </div>
       </div>
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const nextTab = v as Tab;
+          setTab(nextTab);
+          pushParams({ tab: tabToUrl(nextTab) });
+        }}
+      >
         <TabsList className="mb-4">
           <TabsTrigger value="individual challenges">Solo challenges</TabsTrigger>
           <TabsTrigger value="team challenges">Team challenges</TabsTrigger>
         </TabsList>
 
         <TabsContent value="individual challenges">
-          <IndividualChallenges initialStats={soloStats} soloProgress={soloProgress} />
+          {showSkeleton || isPending ? (
+            <IndividualChallengesSkeleton />
+          ) : (
+            <IndividualChallenges initialStats={soloStats} soloProgress={soloProgress} />
+          )}
         </TabsContent>
 
         <TabsContent value="team challenges">
-          <TeamChallenges initialStats={teamStats} teamProgress={teamProgress ?? null} />
+          {showSkeleton || isPending ? (
+            <TeamChallengesSkeleton />
+          ) : (
+            <TeamChallenges initialStats={teamStats} teamProgress={teamProgress ?? null} />
+          )}
         </TabsContent>
-      </Tabs>
+        </Tabs>
     </div>
   );
 }
