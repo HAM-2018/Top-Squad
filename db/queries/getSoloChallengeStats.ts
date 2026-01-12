@@ -1,34 +1,27 @@
-import { auth } from "@clerk/nextjs/server";
 import { challengeAttemptsTable, challengePartsTable, challengeTable, teamChallengesTable, teamMembersTable, usersTable } from "../schema";
 import { asc, eq, min, desc, max, and } from "drizzle-orm";
 import { db } from "..";
 import { MultiPartChallengeStats, } from "@/types/individualchallengeStats";
 
 
-
-export async function getSoloChallengeStats(input?: {
+export async function getSoloChallengeStats(input: {
   teamChallengeId?: number;
+  userId: number; 
 }): Promise<MultiPartChallengeStats | null> {
 
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+ 
+  if (!input?.userId) throw new Error("Unauthorized");
 
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, userId));
-
-  if (!user) throw new Error("User not found");
 
   // scope challenge to specific teamChallengeId
   const whereClause = input?.teamChallengeId
     ? and(
-        eq(challengeAttemptsTable.userId, user.id),
+        eq(challengeAttemptsTable.userId, input.userId),
         eq(challengeTable.isTeamBased, false),
         eq(challengeAttemptsTable.teamChallengeId, input.teamChallengeId)
       )
     : and(
-        eq(challengeAttemptsTable.userId, user.id),
+        eq(challengeAttemptsTable.userId, input.userId),
         eq(challengeTable.isTeamBased, false)
       );
 
@@ -135,7 +128,7 @@ export async function getSoloChallengeStats(input?: {
     }
 
     // My rank/value for this part
-    const myIndex = normalized.findIndex((l) => l.userId === user.id);
+    const myIndex = normalized.findIndex((l) => l.userId === input.userId);
     const myRank = myIndex >= 0 ? myIndex + 1 : null;
     const myValue = myIndex >= 0 ? normalized[myIndex].bestValue : null;
 
@@ -187,7 +180,7 @@ export async function getSoloChallengeStats(input?: {
     })
     .sort((a, b) => a.points - b.points);
 
-  const myOverallIndex = overallLeaderboard.findIndex((l) => l.userId === user.id);
+  const myOverallIndex = overallLeaderboard.findIndex((l) => l.userId === input.userId);
   const myPoints = myOverallIndex >= 0 ? overallLeaderboard[myOverallIndex].points : null;
   const myOverallRank = myOverallIndex >= 0 ? myOverallIndex + 1 : null;
 

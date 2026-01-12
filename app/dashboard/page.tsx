@@ -47,7 +47,7 @@ export default async function DashboardPage({
   searchParams?: Promise<SearchParams>;
 }) {
 
-  await getCurrentUser();
+  const user = await getCurrentUser();
 
   const sp = (await searchParams) ?? {};
 
@@ -62,8 +62,8 @@ export default async function DashboardPage({
   // get teams and solo challenges
   const [teams, soloOptions, teamOptions] = await Promise.all([
     getTeams(),
-    getSoloChallengeOptions(),
-    activeTab === "team" ? getTeamChallengeOptions() : Promise.resolve([]),
+    getSoloChallengeOptions(user.id),
+    activeTab === "team" ? getTeamChallengeOptions(user.id) : Promise.resolve([]),
   ]);
 
   // pick base team
@@ -82,11 +82,11 @@ export default async function DashboardPage({
   // SOLO stats/progress 
   const [soloStats, soloProgress] = await Promise.all([
     selectedSoloTeamChallengeId
-      ? getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId })
+      ? getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId, userId: user.id })
       : Promise.resolve(null),
 
     selectedSoloTeamChallengeId
-      ? getSoloChallengeProgressDaily(selectedSoloTeamChallengeId)
+      ? getSoloChallengeProgressDaily(user.id, selectedSoloTeamChallengeId)
       : Promise.resolve(null),
   ]);
 
@@ -106,11 +106,11 @@ export default async function DashboardPage({
 
     [teamStats, teamProgress] = await Promise.all([
       selectedTeamTeamChallengeId
-        ? getTeamChallengeStats({ teamChallengeId: selectedTeamTeamChallengeId })
+        ? getTeamChallengeStats({ userId: user.id, teamChallengeId: selectedTeamTeamChallengeId })
         : Promise.resolve(null),
 
       selectedTeamTeamChallengeId
-        ? getTeamChallengeProgressDaily(selectedTeamTeamChallengeId)
+        ? getTeamChallengeProgressDaily(user.id, selectedTeamTeamChallengeId)
         : Promise.resolve(null),
     ]);
   }

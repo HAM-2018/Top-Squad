@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import {
   challengeAttemptsTable,
@@ -8,17 +7,17 @@ import {
   teamMembersTable,
   usersTable,
 } from "@/db/schema";
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { SoloProgress } from "@/types/lineGraphStats";
+import { dayRange } from "@/lib/dayRange";
+
+
 
 export async function getSoloChallengeProgressDaily(
+  userId: number,
   teamChallengeId: number
 ): Promise<SoloProgress | null> {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) throw new Error("Unauthorized");
-
-  const [me] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
-  if (!me) throw new Error("User not found");
+  if (!userId) throw new Error("Unauthorized");
 
   // identify the selected teamChallenge
   const [tc] = await db
@@ -61,7 +60,7 @@ export async function getSoloChallengeProgressDaily(
   const users = members.map((m) => ({
     userId: m.userId,
     name: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() || m.email,
-    isMe: m.userId === me.id,
+    isMe: m.userId === userId,
     avatarUrl: m.avatarUrl ?? null,
   }));
 
@@ -76,7 +75,14 @@ export async function getSoloChallengeProgressDaily(
     .where(eq(challengePartsTable.challengeId, tc.challengeId))
     .orderBy(asc(challengePartsTable.sortOrder));
 
-  // dates from attempts for this teamChallenge
+  if (parts.length === 0) {
+    return { teamChallengeId: tc.id, users, overall: [], parts: {} };
+  }
+
+  const partIds = parts.map((p) => p.id);
+  const metricByPart = new Map<number, string>(parts.map((p) => [p.id, p.metric]));
+
+  // date bounds
   const [bounds] = await db
     .select({
       minDay: sql<string | null>`
@@ -96,85 +102,127 @@ export async function getSoloChallengeProgressDaily(
     return { teamChallengeId: tc.id, users, overall: [], parts: {} };
   }
 
-  const days = await db.execute<{ t: string }>(sql`
-    SELECT to_char(d::date, 'YYYY-MM-DD') as t
-    FROM generate_series(${minDay}::date, ${maxDay}::date, interval '1 day') d
-    ORDER BY d ASC
-  `);
+  const days = dayRange(minDay, maxDay);
 
-  async function valuesAndRanksForPartAtDay(partId: number, metric: string, day: string) {
-    const isTime = metric === "time";
-    const bestExpr = isTime
-      ? sql<number>`min(${challengeAttemptsTable.value})`
-      : sql<number>`max(${challengeAttemptsTable.value})`;
-
-    const cutoff = sql`${day}::date + interval '1 day' - interval '1 second'`;
-
-    const perUserBest = await db
-      .select({
-        userId: challengeAttemptsTable.userId,
-        bestValue: bestExpr,
-      })
-      .from(challengeAttemptsTable)
-      .where(
-        and(
-          eq(challengeAttemptsTable.teamChallengeId, tc.id),
-          eq(challengeAttemptsTable.challengePartId, partId),
-          lte(challengeAttemptsTable.recordedAt, cutoff)
-        )
+  // Fetch all attempts once
+  const attempts = await db
+    .select({
+      day: sql<string>`to_char(date_trunc('day', ${challengeAttemptsTable.recordedAt}), 'YYYY-MM-DD')`,
+      userId: challengeAttemptsTable.userId,
+      partId: challengeAttemptsTable.challengePartId,
+      value: challengeAttemptsTable.value,
+    })
+    .from(challengeAttemptsTable)
+    .where(
+      and(
+        eq(challengeAttemptsTable.teamChallengeId, tc.id),
+        inArray(challengeAttemptsTable.userId, userIds),
+        inArray(challengeAttemptsTable.challengePartId, partIds)
       )
-      .groupBy(challengeAttemptsTable.userId);
+    );
 
-    const totals = new Map<number, number>();
-    for (const row of perUserBest) {
-      if (row.bestValue == null) continue;
-      totals.set(row.userId, Number(row.bestValue));
+
+  //Build daily best-by (day, partId, userId)
+  // dailyBest.get(day).get(partId).get(userId) => best value on day
+  const dailyBest = new Map<string, Map<number, Map<number, number>>>();
+
+  for (const a of attempts) {
+    const day = a.day;
+    const partId = a.partId;
+    const uid = a.userId;
+
+    if (a.value == null) continue;
+    const val = Number(a.value);
+    const metric = metricByPart.get(partId) ?? "";
+    const isTime = metric === "time";
+
+    let byPart = dailyBest.get(day);
+    if (!byPart) {
+      byPart = new Map();
+      dailyBest.set(day, byPart);
     }
 
-    const values: Record<number, number | null> = {};
-    for (const uid of userIds) values[uid] = totals.has(uid) ? totals.get(uid)! : null;
+    let byUser = byPart.get(partId);
+    if (!byUser) {
+      byUser = new Map();
+      byPart.set(partId, byUser);
+    }
 
-    const ranked = userIds
-      .map((uid) => ({ uid, total: totals.get(uid) ?? null }))
-      .filter((x) => x.total !== null) as { uid: number; total: number }[];
-
-    ranked.sort((a, b) => (isTime ? a.total - b.total : b.total - a.total));
-
-    const ranks: Record<number, number> = {};
-    ranked.forEach((u, idx) => (ranks[u.uid] = idx + 1));
-
-    return { values, ranks };
+    const prev = byUser.get(uid);
+    if (prev == null) {
+      byUser.set(uid, val);
+    } else {
+      // best within the same day
+      byUser.set(uid, isTime ? Math.min(prev, val) : Math.max(prev, val));
+    }
   }
 
+  // days in order, maintaining running "best so far" per part/user
   const partsOut: SoloProgress["parts"] = {};
   const overallOut: SoloProgress["overall"] = [];
 
-  for (const d of days.rows) {
-    const t = d.t;
+  // runningBest.get(partId).get(userId) => best so far up to current day
+  const runningBest = new Map<number, Map<number, number | null>>();
+  for (const p of parts) {
+    const m = new Map<number, number | null>();
+    for (const uid of userIds) m.set(uid, null);
+    runningBest.set(p.id, m);
+  }
 
-    const ranksByPart = new Map<number, Record<number, number>>();
+  for (const t of days) {
+    // update running best using today's daily best
+    const today = dailyBest.get(t);
+
+    // ranks per part for this day (uid -> rank)
+    const ranksByPart = new Map<number, Map<number, number>>();
 
     for (const p of parts) {
-      const { values, ranks } = await valuesAndRanksForPartAtDay(p.id, p.metric, t);
+      const metric = p.metric;
+      const isTime = metric === "time";
+      const rb = runningBest.get(p.id)!;
+
+      const todayForPart = today?.get(p.id); // Map<uid, bestToday>
+
+      if (todayForPart) {
+        for (const [uid, bestToday] of todayForPart.entries()) {
+          const prev = rb.get(uid);
+          if (prev == null) rb.set(uid, bestToday);
+          else rb.set(uid, isTime ? Math.min(prev, bestToday) : Math.max(prev, bestToday));
+        }
+      }
+
+      // emit values for this part/day
+      const values: Record<number, number | null> = {};
+      for (const uid of userIds) values[uid] = rb.get(uid) ?? null;
 
       const key = String(p.id);
       if (!partsOut[key]) partsOut[key] = [];
       partsOut[key].push({ t, values });
 
+      // compute ranks for this part/day
+      const ranked = userIds
+        .map((uid) => ({ uid, total: rb.get(uid) ?? null }))
+        .filter((x): x is { uid: number; total: number } => x.total !== null);
+
+      ranked.sort((a, b) => (isTime ? a.total - b.total : b.total - a.total));
+
+      const ranks = new Map<number, number>();
+      ranked.forEach((u, idx) => ranks.set(u.uid, idx + 1));
       ranksByPart.set(p.id, ranks);
     }
 
-    // overall points = sum of ranks across parts
+    // overall points = sum of ranks across parts (only when ranked)
     const pointsByUser = new Map<number, number>();
     for (const ranks of ranksByPart.values()) {
-      for (const [uidStr, rnk] of Object.entries(ranks)) {
-        const uid = Number(uidStr);
+      for (const [uid, rnk] of ranks.entries()) {
         pointsByUser.set(uid, (pointsByUser.get(uid) ?? 0) + rnk);
       }
     }
 
     const overallValues: Record<number, number | null> = {};
-    for (const uid of userIds) overallValues[uid] = pointsByUser.has(uid) ? pointsByUser.get(uid)! : null;
+    for (const uid of userIds) {
+      overallValues[uid] = pointsByUser.has(uid) ? pointsByUser.get(uid)! : null;
+    }
 
     overallOut.push({ t, values: overallValues });
   }

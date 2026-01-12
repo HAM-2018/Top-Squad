@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "..";
 import {
@@ -7,7 +6,6 @@ import {
   teamChallengesTable,
   teamMembersTable,
   teamsTable,
-  usersTable,
 } from "../schema";
 
 export type TeamChallengeOption = {
@@ -19,13 +17,10 @@ export type TeamChallengeOption = {
   lastRecordedAt: Date | null;
 };
 
-// Return all TEAM-based teamChallenge instances the user has access to
-export async function getTeamChallengeOptions(): Promise<TeamChallengeOption[]> {
-  const { userId } = await auth();
+// Return all TEAM-based teamChallenge instances the user has 
+export async function getTeamChallengeOptions(userId: number): Promise<TeamChallengeOption[]> {
+  
   if (!userId) throw new Error("Unauthorized");
-
-  const [me] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId));
-  if (!me) throw new Error("User not found");
 
   // attempts order by most recent
   const rows = await db
@@ -42,7 +37,7 @@ export async function getTeamChallengeOptions(): Promise<TeamChallengeOption[]> 
     .innerJoin(teamsTable, eq(teamsTable.id, teamChallengesTable.teamId))
     .innerJoin(
       teamMembersTable,
-      and(eq(teamMembersTable.teamId, teamChallengesTable.teamId), eq(teamMembersTable.userId, me.id)),
+      and(eq(teamMembersTable.teamId, teamChallengesTable.teamId), eq(teamMembersTable.userId, userId)),
     )
     .leftJoin(
       challengeAttemptsTable,

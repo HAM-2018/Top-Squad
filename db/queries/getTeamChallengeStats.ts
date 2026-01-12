@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import {
   challengeAttemptsTable,
@@ -9,21 +8,17 @@ import {
   teamsTable,
   usersTable,
 } from "@/db/schema";
-import { and, asc, desc, eq, inArray, min, max } from "drizzle-orm";
+import { and, asc, eq, inArray, min, max } from "drizzle-orm";
 
 export async function getTeamChallengeStats({
+  userId,
   teamChallengeId,
 }: {
+  userId: number
   teamChallengeId: number;
 }) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) throw new Error("Unauthorized");
 
-  const [me] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, clerkId));
-  if (!me) throw new Error("User not found");
+  if (!userId) throw new Error("Unauthorized");
 
   const [selected] = await db
     .select({
@@ -37,7 +32,7 @@ export async function getTeamChallengeStats({
       teamMembersTable,
       and(
         eq(teamMembersTable.teamId, teamChallengesTable.teamId),
-        eq(teamMembersTable.userId, me.id)
+        eq(teamMembersTable.userId, userId)
       )
     )
     .where(and(eq(teamChallengesTable.id, teamChallengeId), eq(challengeTable.isTeamBased, true)))

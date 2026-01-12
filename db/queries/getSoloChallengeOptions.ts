@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "..";
 import {
@@ -7,7 +6,6 @@ import {
   teamChallengesTable,
   teamMembersTable,
   teamsTable,
-  usersTable,
 } from "../schema";
 
 export type SoloChallengeOption = {
@@ -21,12 +19,9 @@ export type SoloChallengeOption = {
 
 // return all solo teamChallenge instances the user has attempted,
 // ordered by most recent attempt. Deduped by teamChallengeId.
-export async function getSoloChallengeOptions(): Promise<SoloChallengeOption[]> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+export async function getSoloChallengeOptions(userId: number): Promise<SoloChallengeOption[]> {
 
-  const [me] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId));
-  if (!me) throw new Error("User not found");
+  if (!userId) throw new Error("Unauthorized");
 
   const rows = await db
     .select({
@@ -45,12 +40,12 @@ export async function getSoloChallengeOptions(): Promise<SoloChallengeOption[]> 
       teamMembersTable,
       and(
         eq(teamMembersTable.teamId, teamChallengesTable.teamId),
-        eq(teamMembersTable.userId, me.id),
+        eq(teamMembersTable.userId, userId),
       ),
     )
     .where(
       and(
-        eq(challengeAttemptsTable.userId, me.id),
+        eq(challengeAttemptsTable.userId, userId),
         eq(challengeTable.isTeamBased, false),
       ),
     )
