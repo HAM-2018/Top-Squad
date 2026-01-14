@@ -7,17 +7,14 @@ import { useEffect, useState } from "react";
 
 export default function DemoDisclaimer() {
     const {isLoaded, isSignedIn} = useUser();
-    const [open, setOpen] = useState(false);
 
-    useEffect(() => {
-        if (!isLoaded) return;
-        setOpen(isSignedIn);
-    }, [isLoaded, isSignedIn]);
+    const [seen, setSeen] = useState(false);
 
     if (!isLoaded || !isSignedIn) return null;
+    const open = !seen;
 
     return (
-        <Dialog open={open} onOpenChange={setOpen} >
+        <Dialog open={open} onOpenChange={(v) => {if (!v) setSeen(true); }} >
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Demo Preview</DialogTitle>
@@ -40,7 +37,7 @@ export default function DemoDisclaimer() {
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                    <Button onClick={() => setOpen(false)}>Okay</Button>
+                    <Button onClick={() => setSeen(true)}>Okay</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
