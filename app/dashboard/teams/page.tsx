@@ -5,7 +5,7 @@ import { getTeamMembers } from "@/db/queries/getTeamMembers";
 export default async function TeamsPage() {
   const teams = await getTeams();
 
-  // default selected team = first team if any
+  // default selected team = first team
   const initialTeamId = teams[0]?.id ?? null;
   const initialMembers = initialTeamId ? await getTeamMembers(initialTeamId) : [];
 

@@ -23,6 +23,7 @@ import {
 import { SoloProgress, TeamProgress } from "@/types/lineGraphStats";
 import TeamChallengesSkeleton from "./components/teams/team.stats.skeleton";
 import IndividualChallengesSkeleton from "./components/personal/personal.stats.skeleton";
+import DemoDisclaimer from "./components/demo-disclaimer";
 
 export default function Dashboard({
   activeTab = "solo",
@@ -170,6 +171,7 @@ export default function Dashboard({
 
   return (
     <div className="space-y-4">
+      <DemoDisclaimer />
       <div className="w-full">
         <div
           className="

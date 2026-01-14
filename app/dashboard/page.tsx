@@ -55,7 +55,7 @@ export default async function DashboardPage({
   const teamIdFromUrl = toPositiveInt(firstParam(sp.team));
   const teamChallengeIdFromUrl = toPositiveInt(firstParam(sp.teamChallenge));
 
-  // find active tab from URL with default of solo
+  // find active tab from URL 
   const tab = firstParam(sp.tab);
   const activeTab: "solo" | "team" = tab === "team" ? "team" : "solo";
 
@@ -90,7 +90,7 @@ export default async function DashboardPage({
       : Promise.resolve(null),
   ]);
 
-  // get team stats when tab is set to "team"
+  // get team stats when tab is set to team
   let selectedTeamTeamChallengeId: number | null = null;
   let teamStats: any = null;
   let teamProgress: any = null;
