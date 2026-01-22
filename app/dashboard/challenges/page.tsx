@@ -25,18 +25,16 @@ export default async function ChallengesPage() {
   }
 
 
-  const teams = await db
-    .select({
-      id: teamsTable.id,
-      name: teamsTable.name,
-    })
+  const [teams, challenges, recordableChallenges] = await Promise.all([
+    db.select({ id: teamsTable.id, name: teamsTable.name })
     .from(teamMembersTable)
     .innerJoin(teamsTable, eq(teamMembersTable.teamId, teamsTable.id))
-    .where(eq(teamMembersTable.userId, user.id));
+    .where(eq(teamMembersTable.userId, user.id)),
 
-  const challenges = await getChallengesWithPartsForUser(user.id);
-
-  const { solo, team } = await getRecordableChallenges();
+    getChallengesWithPartsForUser(user.id),
+    getRecordableChallenges(),
+  ]);
+  const { solo, team } = recordableChallenges;
 
   return (
     <>

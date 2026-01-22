@@ -33,13 +33,13 @@ export default function CreateTeamCard({ onCreate }: Props) {
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
 
-  // Derive preview URL from avatarFile
+  // Derive preview URL
   const avatarPreviewUrl = useMemo(() => {
     if (!avatarFile) return null;
     return URL.createObjectURL(avatarFile);
   }, [avatarFile]);
 
-  // Cleanup object URL when it changes / component unmounts
+  // Cleanup object URL when it changes
   useEffect(() => {
     if (!avatarPreviewUrl) return;
     return () => URL.revokeObjectURL(avatarPreviewUrl);

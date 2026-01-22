@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "..";
 import { teamMembersTable, teamsTable, usersTable } from "../schema";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { TeamList } from "@/types/teams";
 
 
@@ -32,7 +32,8 @@ export async function getTeams(): Promise<TeamList[]> {
     })
     .from(teamMembersTable)
     .innerJoin(teamsTable, eq(teamMembersTable.teamId, teamsTable.id))
-    .where(and(eq(teamMembersTable.userId, user.id), eq(teamsTable.isActive, true)));
+    .where(and(eq(teamMembersTable.userId, user.id), eq(teamsTable.isActive, true)))
+    .orderBy(desc(teamsTable.updatedAt), desc(teamsTable.id));
 
   const map = new Map<number, TeamList>();
   for (const team of teams) map.set(team.id, team);

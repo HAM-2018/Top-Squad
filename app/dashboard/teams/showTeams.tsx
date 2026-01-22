@@ -54,11 +54,20 @@ export default function ShowTeams({
     if (!selectedTeamId) {
       return;
     }
+    // skip refetch if you already have members passed from server
+    if (initialTeamId && selectedTeamId === String(initialTeamId)) {
+      return;
+    }
+    let cancel = false;
 
     startTransition(async () => {
       const next = await getTeamMembers(Number(selectedTeamId));
-      setFetchedMembers(next);
+      if (!cancel) setFetchedMembers(next);
     });
+
+    return () => {
+      cancel = true;
+    };
   }, [selectedTeamId]);
 
   return (
@@ -67,10 +76,15 @@ export default function ShowTeams({
       <Card>
         <CardHeader className="py-0">
           <CardTitle className="text-xl flex items-center justify-between border-b border-rose-500 pb-1">
-            My Teams <UsersIcon size={40} />
+            My Teams 
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/dashboard/teams/new">
+                <UsersIcon className="h-4 w-4 mr-2" />
+                Create
+              </Link>
+            </Button> 
           </CardTitle>
         </CardHeader>
-
         <CardContent className="pt-4 space-y-3">
           {teams.length === 0 ? (
             <div className="text-sm text-muted-foreground">
@@ -209,13 +223,6 @@ export default function ShowTeams({
           )}
         </CardContent>
       </Card>
-
-      <CreateTeamCard
-        onCreate={(newTeamId) => {
-          setSelectedTeamId(String(newTeamId));
-          setFetchedMembers(null);
-        }}
-      />
     </>
   );
 }
