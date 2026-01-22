@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { makeColumns } from "./columns";
 import { TeamList, TeamMember } from "@/types/teams";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { getTeamMembers } from "@/db/queries/getTeamMembers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -63,20 +63,20 @@ export default function ShowTeams2({
         return () => {
           cancel = true;
         };
-      }, [selectedTeamId]);
+      }, [selectedTeamId, initialTeamId, startTransition]);
 
-      const regetMembers = async () => {
+      const regetMembers = useCallback (async () => {
         if (!selectedTeamId) return;
         const updated = await getTeamMembers(Number(selectedTeamId));
         setFetchedMembers(updated);
-      };
+      }, [selectedTeamId]);
 
       // On change rebuild columns with teamId
         const tableColumns = useMemo(() => {
         const teamId = Number(selectedTeamId);
         if (!teamId) return makeColumns({ teamId: 0, onChange: regetMembers }); // safe fallback
         return makeColumns({ teamId, onChange: regetMembers });
-        }, [selectedTeamId, initialTeamId, startTransition]); 
+        }, [selectedTeamId, initialTeamId]); 
 
 
     return (
