@@ -29,7 +29,7 @@ export default function ShowTeams2({
     
       // only store fetched members
       const [fetchedMembers, setFetchedMembers] = useState<TeamMember[] | null>(null);
-      const [isPending, startTransition] = useTransition();
+      const [, startTransition] = useTransition();
 
       const selectedTeam = useMemo(() => 
         teams.find((t) => String(t.id) === selectedTeamId) ?? null,
@@ -76,7 +76,7 @@ export default function ShowTeams2({
         const teamId = Number(selectedTeamId);
         if (!teamId) return makeColumns({ teamId: 0, onChange: regetMembers }); // safe fallback
         return makeColumns({ teamId, onChange: regetMembers });
-        }, [selectedTeamId, initialTeamId]); 
+        }, [selectedTeamId, regetMembers]); 
 
 
     return (
