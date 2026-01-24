@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,50 +12,42 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-
 import { inviteTeamToChallenge } from "@/db/mutations/inviteTeamToChallenge";
 import { respondToChallengeInvite } from "@/db/mutations/respondToChallengeInvite";
+import { respondToTeamInvite } from "@/db/mutations/respondToTeamInvite"; 
 import { searchTeamsByName } from "@/db/queries/searchTeamsByName";
-
 import type { ChallengeWithParts } from "@/types/individualchallengeStats";
-import type { TeamList } from "@/types/teams";
+import type { Team, TeamList } from "@/types/teams";
+import { ChallengeInvite, PendingTeamInvite } from "@/types/teamInvites";
 
-type TeamsSearchRow = {
-  id: number;
-  name: string;
-  avatarUrl: string | null;
-};
-
-type PendingInvites = {
-  inviteId: number;
-  teamId: number;
-  teamName: string;
-  challengeId: number;
-  challengeName: string;
-  createdAt: Date | null;
-};
 
 export default function Invites({
   initialChallenges,
   initialInvites,
-  teams, // teams you are a member of
+  initialTeamInvites,
+  teams,
 }: {
   initialChallenges: ChallengeWithParts[];
-  initialInvites: PendingInvites[];
+  initialInvites: ChallengeInvite[];
+  initialTeamInvites: PendingTeamInvite[]; 
   teams: TeamList[];
 }) {
   const [pending, startTransition] = useTransition();
 
   const [selectedHostTeamId, setSelectedHostTeamId] = useState<string>("");
-
   const [selectedChallengeId, setSelectedChallengeId] = useState<string>("");
 
   const [teamQuery, setTeamQuery] = useState("");
-  const [teamResults, setTeamResults] = useState<TeamsSearchRow[]>([]);
+  const [teamResults, setTeamResults] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
-  // Invites list
-  const [invites, setInvites] = useState<PendingInvites[]>(initialInvites);
+  // Challenge invites list 
+  const [invites, setInvites] = useState<ChallengeInvite[]>(initialInvites);
+
+  // Team invites list 
+  const [teamInvites, setTeamInvites] = useState<PendingTeamInvite[]>(
+    initialTeamInvites
+  );
 
   const selectedHostTeam = useMemo(() => {
     const id = Number(selectedHostTeamId);
@@ -64,13 +55,10 @@ export default function Invites({
     return teams.find((t) => t.id === id) ?? null;
   }, [selectedHostTeamId, teams]);
 
-  // Challenges hosted by the selected team
   const teamChallenges = useMemo(() => {
     const hostId = Number(selectedHostTeamId);
     if (!hostId) return [];
-    return initialChallenges.filter(
-      (c) => c.isTeamBased && c.groupId === hostId
-    );
+    return initialChallenges.filter((c) => c.isTeamBased && c.groupId === hostId);
   }, [initialChallenges, selectedHostTeamId]);
 
   const selectedTeam = useMemo(
@@ -121,7 +109,7 @@ export default function Invites({
     });
   }
 
-  function respond(inviteId: number, action: "accept" | "decline") {
+  function respondChallengeInvite(inviteId: number, action: "accept" | "decline") {
     startTransition(async () => {
       try {
         await respondToChallengeInvite(inviteId, action);
@@ -133,117 +121,125 @@ export default function Invites({
     });
   }
 
+  //Respond to TEAM invite 
+  function respondTeamInvite(inviteId: number, action: "accept" | "decline") {
+    startTransition(async () => {
+      try {
+        await respondToTeamInvite(inviteId, action);
+        setTeamInvites((prev) => prev.filter((i) => i.inviteId !== inviteId));
+        toast.success(action === "accept" ? "Invite accepted." : "Invite declined.");
+      } catch (e: any) {
+        toast.error(e?.message ?? "Failed to respond.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-6 mx-auto max-w-5xl w-full">
+      {/* INVITE A TEAM INTO A CHALLENGE */}
       <Card className="border border-rose-500/40">
         <CardHeader className="pb-2 border-b border-rose-500">
           <CardTitle className="text-2xl">Invite a Team</CardTitle>
+          <div className="text-muted-foreground text-sm">
+            Team Challenge? Invite other teams to join an existing challenge.
+          </div>
         </CardHeader>
-
         <CardContent className="pt-4 space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-4">
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <p className="text-sm font-medium">Your Team</p>
                 <Select
-                    value={selectedHostTeamId}
-                    onValueChange={(val) => {
+                  value={selectedHostTeamId}
+                  onValueChange={(val) => {
                     setSelectedHostTeamId(val);
                     setSelectedChallengeId("");
                     setTeamQuery("");
                     setTeamResults([]);
                     setSelectedTeamId(null);
-                    }}
+                  }}
                 >
-                    <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select one of your teams" />
-                    </SelectTrigger>
-
-                    <SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
                     {teams.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id)}>
+                      <SelectItem key={t.id} value={String(t.id)}>
                         {t.name}
-                        </SelectItem>
+                      </SelectItem>
                     ))}
-                    </SelectContent>
+                  </SelectContent>
                 </Select>
-                </div>
-
-                {/* Challenge */}
-                <div className="space-y-2">
+              </div>
+              <div className="space-y-2">
                 <p className="text-sm font-medium">Team Challenge</p>
                 <Select
-                    value={selectedChallengeId}
-                    onValueChange={setSelectedChallengeId}
-                    disabled={!selectedHostTeamId}
+                  value={selectedChallengeId}
+                  onValueChange={setSelectedChallengeId}
+                  disabled={!selectedHostTeamId}
                 >
-                    <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue
-                        placeholder={
+                      placeholder={
                         selectedHostTeamId
-                            ? "Select a team challenge"
-                            : "Select your team first"
-                        }
+                          ? "Select a team challenge"
+                          : "Select your team first"
+                      }
                     />
-                    </SelectTrigger>
-
-                    <SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
                     {teamChallenges.map((c) => (
-                        <SelectItem key={c.challengeId} value={String(c.challengeId)}>
+                      <SelectItem key={c.challengeId} value={String(c.challengeId)}>
                         {c.name}
-                        </SelectItem>
+                      </SelectItem>
                     ))}
-                    </SelectContent>
+                  </SelectContent>
                 </Select>
-
                 {selectedHostTeamId && teamChallenges.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     No team-based challenges found for this team.
-                    </p>
+                  </p>
                 ) : null}
-
                 {selectedChallenge ? (
-                    <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Inviting into:{" "}
                     <span className="font-medium">{selectedChallenge.name}</span>
-                    </p>
+                  </p>
                 ) : null}
-                </div>
+              </div>
             </div>
-            {/* Avatar*/}
             <div className="flex justify-end">
-            <div className="rounded-lg border overflow-hidden bg-muted w-[180px] h-[180px]">
+              <div className="rounded-lg border overflow-hidden bg-muted w-45 h-45">
                 {selectedHostTeam ? (
-                selectedHostTeam.avatarUrl ? (
+                  selectedHostTeam.avatarUrl ? (
                     <img
-                    src={selectedHostTeam.avatarUrl}
-                    alt={selectedHostTeam.name}
-                    className="w-full h-full object-cover"
+                      src={selectedHostTeam.avatarUrl}
+                      alt={selectedHostTeam.name}
+                      className="w-full h-full object-cover"
                     />
-                ) : (
+                  ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-5xl font-bold text-muted-foreground">
+                      <span className="text-5xl font-bold text-muted-foreground">
                         {selectedHostTeam.name
-                        .split(" ")
-                        .filter(Boolean)
-                        .map((w) => w[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </span>
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </span>
                     </div>
-                )
+                  )
                 ) : (
-                <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-full h-full flex items-center justify-center">
                     <span className="text-sm text-muted-foreground">Select a team</span>
-                </div>
+                  </div>
                 )}
+              </div>
             </div>
-            </div>
-            </div>
-            <div className="space-y-2">
+          </div>
+          <div className="space-y-2">
             <p className="text-sm font-medium">Search Team to Invite</p>
-
             <Input
               value={teamQuery}
               onChange={(e) => onSearchChange(e.target.value)}
@@ -276,15 +272,15 @@ export default function Invites({
               </p>
             )}
           </div>
+
           <Separator />
+
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm text-muted-foreground truncate">
               {selectedTeam ? (
                 <>
                   Selected team:{" "}
-                  <span className="font-medium text-foreground">
-                    {selectedTeam.name}
-                  </span>
+                  <span className="font-medium text-foreground">{selectedTeam.name}</span>
                 </>
               ) : (
                 "Select a team to invite."
@@ -292,27 +288,68 @@ export default function Invites({
             </div>
             <Button
               onClick={sendInvite}
-              disabled={
-                pending ||
-                !selectedHostTeamId ||
-                !selectedChallengeId ||
-                !selectedTeamId
-              }
+              disabled={pending || !selectedHostTeamId || !selectedChallengeId || !selectedTeamId}
             >
               {pending ? "Working..." : "Send Invite"}
             </Button>
           </div>
+
           <p className="text-xs text-muted-foreground">
             Note: you can only successfully invite if you’re a host-team admin/owner.
           </p>
         </CardContent>
       </Card>
-      {/* INVITES */}
+
+      {/* TEAM INVITES */}
       <Card>
         <CardHeader className="pb-2 border-b border-rose-500">
-          <CardTitle className="text-xl">Your Invites</CardTitle>
+          <CardTitle className="text-xl">Your Team Invites</CardTitle>
         </CardHeader>
-
+        <CardContent className="pt-4">
+          {teamInvites.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No pending invites to join a new team.</p>
+          ) : (
+            <div className="space-y-3">
+              {teamInvites.map((inv) => (
+                <div key={inv.inviteId} className="rounded-md border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{inv.teamName}</div>
+                      {inv.invitedByName ? (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Invited by <span className="font-medium">{inv.invitedByName}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() => respondTeamInvite(inv.inviteId, "decline")}
+                      >
+                        Decline
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => respondTeamInvite(inv.inviteId, "accept")}
+                      >
+                        Accept
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {/*CHALLENGE TEAM INVITES */}
+      <Card>
+        <CardHeader className="pb-2 border-b border-rose-500">
+          <CardTitle className="text-xl">Challenge Invites</CardTitle>
+        </CardHeader>
         <CardContent className="pt-4">
           {invites.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -326,8 +363,7 @@ export default function Invites({
                     <div className="min-w-0">
                       <div className="font-medium truncate">{inv.challengeName}</div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Invited team:{" "}
-                        <span className="font-medium">{inv.teamName}</span>
+                        Invited team: <span className="font-medium">{inv.teamName}</span>
                       </div>
                     </div>
 
@@ -336,14 +372,14 @@ export default function Invites({
                         size="sm"
                         variant="outline"
                         disabled={pending}
-                        onClick={() => respond(inv.inviteId, "decline")}
+                        onClick={() => respondChallengeInvite(inv.inviteId, "decline")}
                       >
                         Decline
                       </Button>
                       <Button
                         size="sm"
                         disabled={pending}
-                        onClick={() => respond(inv.inviteId, "accept")}
+                        onClick={() => respondChallengeInvite(inv.inviteId, "accept")}
                       >
                         Accept
                       </Button>

@@ -40,4 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# drizzle
+drizzle/meta/
+drizzle/schema.ts
+drizzle/relations.ts
+drizzle/_old/
+
 

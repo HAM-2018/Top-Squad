@@ -146,7 +146,7 @@ export const challengeResultsTable = pgTable("challenge_results", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-//Invite teams into the TeamChallenge
+//Invite individual to teams or teams into the TeamChallenge
 export const inviteStatus = pgEnum("invite_status", [
   "pending",
   "accepted",
@@ -174,3 +174,26 @@ export const challengeTeamInvitesTable = pgTable(
     uniqInvite: uniqueIndex("uniq_challenge_team_invite").on(t.challengeId, t.teamId),
   })
 );
+
+export const teamInvitesTable = pgTable(
+  "team_invites", {
+    id: serial("id").primaryKey(),
+    teamId: integer("team_id")
+      .notNull().references(() => teamsTable.id, {"onDelete": "cascade"}),
+    invitedByUserId: integer("invited_by_user_id")
+      .notNull().references(() => usersTable.id),
+    invitedEmail: text("invited_email").notNull(),
+    invitedFirstName: text("invited_first_name"),
+    invitedLastName: text("invited_last_name"),
+    invitedUserId: integer("invited_user_id").references(() => usersTable.id),
+    status: inviteStatus("status").notNull().default("pending"),
+    createdAt: timestamp("created_at").defaultNow(),
+    respondedAt: timestamp("responded_at"),
+  },
+  (t) => ({
+    uniqueTeamInviteEmail: uniqueIndex("unique_team_invite_email").on(
+      t.teamId,
+      sql`lower(${t.invitedEmail})`
+    ),
+  }
+))

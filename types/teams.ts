@@ -13,3 +13,9 @@ export type TeamList = {
   isActive: boolean;
   avatarUrl: string | null;
 };
+
+export type Team = {
+  id: number;
+  name: string;
+  avatarUrl: string | null;
+};

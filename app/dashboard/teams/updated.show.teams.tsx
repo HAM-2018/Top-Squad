@@ -22,11 +22,9 @@ export default function ShowTeams2({
     initialTeamId: number | null;
     initialMembers: TeamMember[];
 }) {
-
     const [selectedTeamId, setSelectedTeamId] = useState<string>(
         initialTeamId ? String(initialTeamId) : ""
       );
-    
       // only store fetched members
       const [fetchedMembers, setFetchedMembers] = useState<TeamMember[] | null>(null);
       const [, startTransition] = useTransition();
@@ -54,7 +52,6 @@ export default function ShowTeams2({
           return;
         }
         let cancel = false;
-    
         startTransition(async () => {
           const next = await getTeamMembers(Number(selectedTeamId));
           if (!cancel) setFetchedMembers(next);
@@ -78,7 +75,6 @@ export default function ShowTeams2({
         return makeColumns({ teamId, onChange: regetMembers });
         }, [selectedTeamId, regetMembers]); 
 
-
     return (
         <>
         <Card>
@@ -95,14 +91,13 @@ export default function ShowTeams2({
                     </div>
                     {selectedTeamId && (
                     <Button asChild size="sm" variant="secondary">
-                        <Link href={`/dashboard/invites`}>
+                        <Link href={`/dashboard/teams/${selectedTeamId}/invites`}>
                         <UserPlus className="h-4 w-4 mr-2" />
                         Invite
                         </Link>
                     </Button>
                     )}
                     </div>
-
                     <div className="pt-2">
                     <Select
                     value={selectedTeamId}
@@ -149,32 +144,6 @@ export default function ShowTeams2({
                 </div>
             ) : (
                 <>
-                <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm text-muted-foreground">
-                    Select a team to view members:
-                    </div>
-
-                    <Select
-                    value={selectedTeamId}
-                    onValueChange={(val) => {
-                        setSelectedTeamId(val);
-                        setFetchedMembers(null); // reset state
-                    }}
-                    >
-
-                    <SelectTrigger className="w-[260px]">
-                        <SelectValue placeholder="Choose a team" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {teams.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id)}>
-                            {t.name}
-                        </SelectItem>
-                        ))}
-                    </SelectContent>
-                    </Select>
-                </div>
-
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {teams.map((team) => (
                     <div
@@ -209,6 +178,5 @@ export default function ShowTeams2({
             </CardContent>
         </Card>
         </>
-        
     )
 }

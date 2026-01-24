@@ -1,28 +1,27 @@
-import { db } from "@/db";
-import { getInvitesForMyTeams } from "@/db/queries/getInvitesForTeam";
-import { getTeamChallengesForUser } from "@/db/queries/getTeamChallengesWithParts"
-import { usersTable } from "@/db/schema";
-import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { getInvitesForMyTeamChallenges } from "@/db/queries/getInvitesForTeamChallenges";
+import { getTeamChallengesForUser } from "@/db/queries/getTeamChallengesWithParts";
 import Invites from "./invites";
 import { getTeams } from "@/db/queries/getTeams";
+import { getCurrentUser } from "@/db/queries/getCurrentUser";
+import { getMyPendingTeamInvites } from "@/db/queries/getUserPendingTeamInvites";
 
 export default async function InvitesPage() {
-    const {userId} = await auth();
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Unauthorized");
 
-    if(!userId) throw new Error("Unauthorized");
+  const [challenge, challengeInvites, teamInvites, teams] = await Promise.all([
+    getTeamChallengesForUser(user.id),
+    getInvitesForMyTeamChallenges(),
+    getMyPendingTeamInvites(),       
+    getTeams(),
+  ]);
 
-    const [user] = await db
-    .select({id: usersTable.id})
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, userId));
-
-    const challenge = await getTeamChallengesForUser(user.id);
-
-    const invites = await getInvitesForMyTeams();
-    const teams = await getTeams();
-
-    return (
-        <Invites initialChallenges={challenge} initialInvites={invites} teams={teams}/>
-    )
+  return (
+    <Invites
+      initialChallenges={challenge}
+      initialInvites={challengeInvites}  
+      initialTeamInvites={teamInvites}        
+      teams={teams}
+    />
+  );
 }
