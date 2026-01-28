@@ -1,16 +1,15 @@
 "use server";
 
 import { type CreateChallenge, createChallengeSchema } from "@/validation/createChallengeSchema";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "..";
 import {
   challengePartsTable,
   challengeTable,
   teamChallengesTable,
   teamMembersTable,
-  usersTable,
 } from "../schema";
 import { eq, and } from "drizzle-orm";
+import { getCurrentUser } from "../queries/getCurrentUser";
 
 export async function createChallenge(input: CreateChallenge) {
   const {
@@ -23,15 +22,8 @@ export async function createChallenge(input: CreateChallenge) {
     parts = [],
   } = createChallengeSchema.parse(input);
 
-  const { userId } = await auth();
-  if (!userId) throw new Error("User not authenticated");
-
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, userId));
-
-  if (!user) throw new Error("User not found");
+  const user  = await getCurrentUser();
+  if (!user) throw new Error("User not authenticated");
 
   //must be admin/owner of host team
   const [membership] = await db
@@ -68,15 +60,22 @@ export async function createChallenge(input: CreateChallenge) {
     // Create parts
     if (parts.length > 0) {
       await tx.insert(challengePartsTable).values(
-        parts.map((part, index) => ({
-          challengeId: challenge.id,
-          name: part.name,
-          metric: part.metric,
-          targetValue: part.targetValue ?? null,
-          unit: part.unit ?? null,
-          sortOrder: part.sortOrder ?? index + 1,
-          isTeamLogOnly: isTeamBased ? (part.isTeamLogOnly ?? false) : false,
-        }))
+        parts.map((part, index) => {
+
+          return {
+            challengeId: challenge.id,
+            name: part.name,
+            metric: part.metric,
+            targetValue: part.targetValue ?? null,
+            unit: part.unit ?? null,
+            sortOrder: part.sortOrder ?? index + 1,
+            isTeamLogOnly: isTeamBased ? (part.isTeamLogOnly ?? false) : false,
+            aggregation: part.aggregation,
+            better: part.better,
+            pointsMode: part.pointsMode,
+            weight: Number(part.weight ?? 1),
+          };
+        })
       );
     }
 

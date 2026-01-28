@@ -1,4 +1,7 @@
 export type TeamMetric = "time" | "distance" | "reps" | "weight";
+export type TeamBetter = "higher" | "lower";
+export type TeamAggregation = "best" | "sum" | "avg" | "latest";
+export type TeamPointsMode = "rank_low_wins" | "rank_high_wins";
 
 export type TeamChartRow = {
   teamId: number;
@@ -21,17 +24,22 @@ export type OverallTeamRow = {
   teamId: number;
   teamName: string;
   avatarUrl: string | null;
-  rank: number; 
-  points: number;     
+  rank: number;
+  points: number;
   isMyTeam: boolean;
 };
 
 export type TeamPartStats = {
   partId: number;
   partName: string;
-  metric: TeamMetric; 
+  metric: TeamMetric;
   unit: string | null;
   isTeamLogOnly: boolean;
+
+  aggregation: TeamAggregation;
+  better: TeamBetter;
+  pointsMode: TeamPointsMode;
+  weight: number;
 
   myTeamRank: number | null;
   myTeamValue: number | null;
@@ -50,6 +58,7 @@ export type TeamChallengeStats = {
     myTeamRank: number | null;
     myTeamPoints: number | null;
     totalTeams: number;
+    pointsMode: TeamPointsMode;
     chartRows: TeamChartRow[];
     teams: OverallTeamRow[];
   };

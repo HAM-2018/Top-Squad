@@ -1,41 +1,41 @@
-import { challengeAttemptsTable, challengePartsTable, challengeTable, teamChallengesTable, teamMembersTable, usersTable } from "../schema";
-import { asc, eq, min, desc, max, and } from "drizzle-orm";
 import { db } from "..";
-import { MultiPartChallengeStats, } from "@/types/individualchallengeStats";
+import {
+  challengeAttemptsTable,
+  challengePartsTable,
+  challengeTable,
+  teamChallengesTable,
+  teamMembersTable,
+  usersTable,
+} from "../schema";
+import { and, asc, desc, eq, max, min, sum, avg, sql } from "drizzle-orm";
 
+import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
+import type { BestAttempt, ChallengeScoring, PointsMode } from "@/types/scoring";
+import { computeSoloStats } from "@/lib/computeSoloStats";
+import { pickAggregatedValue } from "@/lib/scoringRules";
 
 export async function getSoloChallengeStats(input: {
   teamChallengeId?: number;
-  userId: number; 
+  userId: number;
 }): Promise<MultiPartChallengeStats | null> {
-
- 
   if (!input?.userId) throw new Error("Unauthorized");
 
-
-  // scope challenge to specific teamChallengeId
-  const whereClause = input?.teamChallengeId
+  const whereClause = input.teamChallengeId
     ? and(
         eq(challengeAttemptsTable.userId, input.userId),
         eq(challengeTable.isTeamBased, false),
         eq(challengeAttemptsTable.teamChallengeId, input.teamChallengeId)
       )
-    : and(
-        eq(challengeAttemptsTable.userId, input.userId),
-        eq(challengeTable.isTeamBased, false)
-      );
+    : and(eq(challengeAttemptsTable.userId, input.userId), eq(challengeTable.isTeamBased, false));
 
-  const [challenge] = await db
+  const [selected] = await db
     .select({
       challengeId: challengeTable.id,
       teamChallengeId: teamChallengesTable.id,
       teamId: teamChallengesTable.teamId,
     })
     .from(challengeAttemptsTable)
-    .innerJoin(
-      teamChallengesTable,
-      eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId)
-    )
+    .innerJoin(teamChallengesTable, eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId))
     .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
     .innerJoin(
       teamMembersTable,
@@ -48,165 +48,137 @@ export async function getSoloChallengeStats(input: {
     .orderBy(desc(challengeAttemptsTable.recordedAt))
     .limit(1);
 
+  if (!selected) return null;
 
-  if (!challenge) return null;
+  const { challengeId, teamChallengeId, teamId } = selected;
 
-  const challengeId = challenge.challengeId;
-  const teamChallengeId = challenge.teamChallengeId;
-  const teamId = challenge.teamId;
-
-  // Get ALL parts
-  const parts = await db
-    .select()
+  // parts + scoring config
+  const partsRows = await db
+    .select({
+      id: challengePartsTable.id,
+      name: challengePartsTable.name,
+      metric: challengePartsTable.metric,
+      unit: challengePartsTable.unit,
+      sortOrder: challengePartsTable.sortOrder,
+      better: challengePartsTable.better,
+      aggregation: challengePartsTable.aggregation, 
+      weight: challengePartsTable.weight,
+      pointsMode: challengePartsTable.pointsMode,
+    })
     .from(challengePartsTable)
     .where(eq(challengePartsTable.challengeId, challengeId))
     .orderBy(asc(challengePartsTable.sortOrder));
 
-  if (!parts.length) return null;
+  if (!partsRows.length) return null;
 
-  //build per-part stats + overall "rank points"
-  const pointsByUser = new Map<number, number>();
-  const nameByUser = new Map<number,{ firstName: string | null; lastName: string | null; avatarUrl: string | null }>();
-
-  const partStats = [];
-
-  for (const part of parts) {
-    const isTime = part.metric === "time";
-
-    // time: lower is better
-    // reps/weight/distance: higher is better
-    const bestExpr = isTime ? min(challengeAttemptsTable.value) : max(challengeAttemptsTable.value);
-
-    const leaderboard = await db
-      .select({
-        userId: challengeAttemptsTable.userId,
-        bestValue: bestExpr,
-        firstName: usersTable.firstName,
-        lastName: usersTable.lastName,
-        avatarUrl: usersTable.avatarUrl
-      })
-      .from(challengeAttemptsTable)
-      .innerJoin(usersTable, eq(usersTable.id, challengeAttemptsTable.userId))
-      .innerJoin(
-        teamMembersTable,
-        and(
-          eq(teamMembersTable.teamId, teamId),
-          eq(teamMembersTable.userId, challengeAttemptsTable.userId)
-        )
-      )
-      .where(
-        and(
-          eq(challengeAttemptsTable.teamChallengeId, teamChallengeId),
-          eq(challengeAttemptsTable.challengePartId, part.id)
-        )
-      )
-      .groupBy(challengeAttemptsTable.userId, usersTable.firstName, usersTable.lastName, usersTable.avatarUrl)
-      .orderBy(isTime ? asc(bestExpr) : desc(bestExpr));
-
-      // Normalize
-     const normalized = leaderboard
-      .map((l) => ({
-        userId: l.userId,
-        firstName: l.firstName,
-        lastName: l.lastName,
-        avatarUrl: l.avatarUrl ?? null,
-        bestValue: l.bestValue === null ? null : Number(l.bestValue),
-      }))
-      .filter((l): l is {
-        userId: number;
-        firstName: string | null;
-        lastName: string | null;
-        avatarUrl: string | null;
-        bestValue: number;
-      } => l.bestValue !== null);
-
-    // Cache names for overall
-    for (const l of normalized) {
-      if (!nameByUser.has(l.userId)) {
-        nameByUser.set(l.userId, { firstName: l.firstName, lastName: l.lastName, avatarUrl: l.avatarUrl ?? null});
-      }
-    }
-
-    // My rank/value for this part
-    const myIndex = normalized.findIndex((l) => l.userId === input.userId);
-    const myRank = myIndex >= 0 ? myIndex + 1 : null;
-    const myValue = myIndex >= 0 ? normalized[myIndex].bestValue : null;
-
-    // Add rank points (overall)
-    normalized.forEach((l, idx) => {
-      const pts = idx + 1;
-      pointsByUser.set(l.userId, (pointsByUser.get(l.userId) ?? 0) + pts);
-    });
-
-    const first = normalized[0] ?? null;
-    const firstPlace = first
-      ? {
-          name: `${first.firstName ?? ""} ${first.lastName ?? ""}`.trim(),
-          value: first.bestValue,
-        }
-      : null;
-
-    const chartRows = normalized.slice(0, 10).map((l) => ({
-      userId: l.userId,
-      name: `${l.firstName ?? ""} ${l.lastName ?? ""}`.trim() || "Unknown",
-      time: l.bestValue,
-      avatarUrl: l.avatarUrl ?? null,
-    }));
-
-    partStats.push({
-      partId: part.id,
-      partName: part.name,
-      metric: part.metric,
-      unit: part.unit ?? null,
-      myRank,
-      myValue,
-      totalCompetitors: normalized.length,
-      firstPlace,
-      chartRows,
-    });
-  }
-
-  // Overall leaderboard by points (lower is better)
-    const overallLeaderboard = Array.from(pointsByUser.entries())
-    .map(([userId, points]) => {
-      const info = nameByUser.get(userId);
-      return {
-        userId,
-        points,
-        firstName: info?.firstName ?? null,
-        lastName: info?.lastName ?? null,
-        avatarUrl: info?.avatarUrl ?? null,
-      };
-    })
-    .sort((a, b) => a.points - b.points);
-
-  const myOverallIndex = overallLeaderboard.findIndex((l) => l.userId === input.userId);
-  const myPoints = myOverallIndex >= 0 ? overallLeaderboard[myOverallIndex].points : null;
-  const myOverallRank = myOverallIndex >= 0 ? myOverallIndex + 1 : null;
-
-  const overallFirst = overallLeaderboard[0] ?? null;
-  const overallFirstPlace = overallFirst
-    ? {
-        name: `${overallFirst.firstName ?? ""} ${overallFirst.lastName ?? ""}`.trim(),
-        points: overallFirst.points,
-      }
-    : null;
-    const overallChartRows = overallLeaderboard.slice(0, 10).map((l) => ({
-    userId: l.userId,
-    name: `${l.firstName ?? ""} ${l.lastName ?? ""}`.trim() || "Unknown",
-    time: l.points,
-    avatarUrl: l.avatarUrl ?? null,
+  const parts: ChallengeScoring[] = partsRows.map((p) => ({
+    partId: p.id,
+    partName: p.name,
+    metric: p.metric,
+    unit: p.unit ?? null,
+    better: p.better,
+    aggregation: p.aggregation,
+    weight: Number(p.weight ?? 1),
+    pointsMode: p.pointsMode,
   }));
 
-  return {
+  const partConfigById = new Map(parts.map((p) => [p.partId, p]));
+
+  // ONE query: per user + part aggregates (min/max/sum/avg)
+  const summary = await db
+    .select({
+      partId: challengeAttemptsTable.challengePartId,
+      userId: challengeAttemptsTable.userId,
+
+      minValue: min(challengeAttemptsTable.value),
+      maxValue: max(challengeAttemptsTable.value),
+      sumValue: sum(challengeAttemptsTable.value),
+      avgValue: avg(challengeAttemptsTable.value),
+
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      avatarUrl: usersTable.avatarUrl,
+    })
+    .from(challengeAttemptsTable)
+    .innerJoin(usersTable, eq(usersTable.id, challengeAttemptsTable.userId))
+    .innerJoin(
+      teamMembersTable,
+      and(eq(teamMembersTable.teamId, teamId), eq(teamMembersTable.userId, challengeAttemptsTable.userId))
+    )
+    .where(eq(challengeAttemptsTable.teamChallengeId, teamChallengeId))
+    .groupBy(
+      challengeAttemptsTable.challengePartId,
+      challengeAttemptsTable.userId,
+      usersTable.firstName,
+      usersTable.lastName,
+      usersTable.avatarUrl
+    );
+
+  // only need if any is "latest"
+  const latest = parts.some((p) => p.aggregation === "latest");
+  const latestByUserPart = new Map<string, number>();
+  if (latest) {
+    const latestRows = await db.execute(sql<{
+      part_id: number;
+      user_id: number;
+      latest_value: number;
+    }>`
+      SELECT DISTINCT ON (a.user_id, a.challenge_part_id)
+        a.challenge_part_id AS part_id,
+        a.user_id          AS user_id,
+        a.value            AS latest_value
+      FROM challenge_attempts a
+      JOIN team_members tm
+        ON tm.user_id = a.user_id
+       AND tm.team_id = ${teamId}
+      WHERE a.team_challenge_id = ${teamChallengeId}
+      ORDER BY a.user_id, a.challenge_part_id, a.recorded_at DESC, a.id DESC
+    `);
+
+    for (const r of latestRows.rows) {
+      latestByUserPart.set(`${r.user_id}:${r.part_id}`, Number(r.latest_value));
+    }
+  }
+
+  const bestAttemptsByPart = new Map<number, BestAttempt[]>();
+
+  for (const row of summary) {
+  const configuration = partConfigById.get(row.partId);
+  if (!configuration) continue;
+
+  const minV = row.minValue == null ? null : Number(row.minValue);
+  const maxV = row.maxValue == null ? null : Number(row.maxValue);
+  const sumV = row.sumValue == null ? null : Number(row.sumValue);
+  const avgV = row.avgValue == null ? null : Number(row.avgValue);
+  const latestV = latestByUserPart.get(`${row.userId}:${row.partId}`) ?? null;
+
+  const bestValue = pickAggregatedValue(
+    { aggregation: configuration.aggregation ?? "best", better: configuration.better ?? "higher" },
+    { minV, maxV, sumV, avgV, latestV }
+  );
+
+  if (bestValue == null) continue;
+
+  const arr = bestAttemptsByPart.get(row.partId) ?? [];
+  arr.push({
+    partId: row.partId,
+    userId: row.userId,
+    bestValue,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    avatarUrl: row.avatarUrl ?? null,
+  });
+  bestAttemptsByPart.set(row.partId, arr);
+}
+
+  // overall mode
+  const overallPointsMode: PointsMode = parts[0]?.pointsMode ?? "rank_low_wins";
+
+  return computeSoloStats({
     challengeId,
-    parts: partStats,
-    overall: {
-      myRank: myOverallRank,
-      myPoints,
-      totalCompetitors: overallLeaderboard.length,
-      firstPlace: overallFirstPlace,
-      chartRows: overallChartRows,
-    },
-  };
+    parts,
+    bestAttemptsByPart,
+    userId: input.userId,
+    overallPointsMode,
+  });
 }

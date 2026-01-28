@@ -3,7 +3,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import IndividualChallenges from "./components/personal/personal-stats";
 import TeamChallenges from "./components/teams/team.stats";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MultiPartChallengeStats } from "@/types/individualchallengeStats";
@@ -57,7 +57,7 @@ export default function Dashboard({
 
   const [isPending, startTransition] = useTransition();
 
-  const { user, isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -164,7 +164,6 @@ export default function Dashboard({
     "sm:h-10 sm:text-sm " +
     "focus:outline-none focus:ring-0 focus:ring-offset-0 " +
     "data-[state=open]:ring-0 data-[state=open]:ring-offset-0";
-
 
   const showSoloHeader = tab === "individual challenges";
   const showTeamHeader = tab === "team challenges";

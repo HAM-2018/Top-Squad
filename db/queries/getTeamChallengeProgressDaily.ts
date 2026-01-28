@@ -10,7 +10,9 @@ import {
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { TeamProgress } from "@/types/lineGraphStats";
 import { dayRange } from "@/lib/dayRange";
-
+import type { DailyCell } from "@/types/challengeProgressDaily";
+import type { Aggregation, Better, PointsMode } from "@/types/scoring";
+import { applyAttemptToDailyCell, pickBetter, addPointsFromRanks, cellToNumber, ensureMap, mergeRunningCell, computeRanks, } from "@/lib/progressCells"; 
 
 export async function getTeamChallengeProgressDaily(
   userId: number,
@@ -28,10 +30,7 @@ export async function getTeamChallengeProgressDaily(
     .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
     .innerJoin(
       teamMembersTable,
-      and(
-        eq(teamMembersTable.teamId, teamChallengesTable.teamId),
-        eq(teamMembersTable.userId, userId)
-      )
+      and(eq(teamMembersTable.teamId, teamChallengesTable.teamId), eq(teamMembersTable.userId, userId))
     )
     .where(and(eq(teamChallengesTable.id, teamChallengeId), eq(challengeTable.isTeamBased, true)))
     .limit(1);
@@ -69,6 +68,10 @@ export async function getTeamChallengeProgressDaily(
       metric: challengePartsTable.metric,
       isTeamLogOnly: challengePartsTable.isTeamLogOnly,
       sortOrder: challengePartsTable.sortOrder,
+      aggregation: challengePartsTable.aggregation,
+      better: challengePartsTable.better,
+      pointsMode: challengePartsTable.pointsMode,
+      weight: challengePartsTable.weight,
     })
     .from(challengePartsTable)
     .where(eq(challengePartsTable.challengeId, selected.challengeId))
@@ -79,18 +82,35 @@ export async function getTeamChallengeProgressDaily(
     return { challengeId: selected.challengeId, teams, overall: [], parts: {} };
   }
 
-  const metricByPart = new Map<number, string>(parts.map((p) => [p.id, p.metric]));
-  const teamLogOnlyByPart = new Map<number, boolean>(parts.map((p) => [p.id, p.isTeamLogOnly]));
+  const configurationByPart = new Map<
+    number,
+    {
+      metric: string;
+      isTeamLogOnly: boolean;
+      aggregation: Aggregation;
+      better: Better;
+      pointsMode: PointsMode;
+      weight: number;
+    }
+  >(
+    parts.map((p) => [
+      p.id,
+      {
+        metric: p.metric,
+        isTeamLogOnly: p.isTeamLogOnly,
+        aggregation: (p.aggregation ?? "best") as Aggregation,
+        better: (p.better ?? "higher") as Better,
+        pointsMode: (p.pointsMode ?? "rank_low_wins") as PointsMode,
+        weight: Number(p.weight ?? 1),
+      },
+    ])
+  );
 
   // Bounds across ALL participating teams for this challenge
   const [bounds] = await db
     .select({
-      minDay: sql<string | null>`
-        to_char(date_trunc('day', min(${challengeAttemptsTable.recordedAt})), 'YYYY-MM-DD')
-      `,
-      maxDay: sql<string | null>`
-        to_char(date_trunc('day', max(${challengeAttemptsTable.recordedAt})), 'YYYY-MM-DD')
-      `,
+      minDay: sql<string | null>`to_char(date_trunc('day', min(${challengeAttemptsTable.recordedAt})), 'YYYY-MM-DD')`,
+      maxDay: sql<string | null>`to_char(date_trunc('day', max(${challengeAttemptsTable.recordedAt})), 'YYYY-MM-DD')`,
     })
     .from(challengeAttemptsTable)
     .where(inArray(challengeAttemptsTable.teamChallengeId, teamChallengeIds));
@@ -104,8 +124,7 @@ export async function getTeamChallengeProgressDaily(
 
   const days = dayRange(minDay, maxDay);
 
-  // Fetch ALL attempts once 
-  // Include day + teamId by joining teamChallengesTable
+  // Fetch ALL attempts once
   const attempts = await db
     .select({
       day: sql<string>`to_char(date_trunc('day', ${challengeAttemptsTable.recordedAt}), 'YYYY-MM-DD')`,
@@ -113,6 +132,8 @@ export async function getTeamChallengeProgressDaily(
       userId: challengeAttemptsTable.userId,
       partId: challengeAttemptsTable.challengePartId,
       value: challengeAttemptsTable.value,
+      recordedAt: challengeAttemptsTable.recordedAt,
+      id: challengeAttemptsTable.id,
     })
     .from(challengeAttemptsTable)
     .innerJoin(teamChallengesTable, eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId))
@@ -123,144 +144,126 @@ export async function getTeamChallengeProgressDaily(
       )
     );
 
-  // Build daily best per (day, part, team, user)
-  // dailyBest.get(day).get(partId).get(teamId).get(userId) => best on day
-  const dailyBest = new Map<string, Map<number, Map<number, Map<number, number>>>>();
+  // dailyAgg.get(day).get(partId).get(teamId).get(userId) => DailyCell
+  const dailyAgg = new Map<string, Map<number, Map<number, Map<number, DailyCell>>>>();
 
   for (const a of attempts) {
     if (a.value == null) continue;
 
-    const day = a.day;
-    const partId = a.partId;
-    const teamId = a.teamId;
-    const uid = a.userId;
+    const cfg = configurationByPart.get(a.partId);
+    if (!cfg) continue;
 
-    const metric = metricByPart.get(partId) ?? "";
-    const isTime = metric === "time";
-    const val = Number(a.value);
+    const byPart = ensureMap(dailyAgg, a.day, () => new Map());
+    const byTeam = ensureMap(byPart, a.partId, () => new Map());
+    const byUser = ensureMap(byTeam, a.teamId, () => new Map());
 
-    let byPart = dailyBest.get(day);
-    if (!byPart) {
-      byPart = new Map();
-      dailyBest.set(day, byPart);
-    }
+    const prev = byUser.get(a.userId);
+    const next = applyAttemptToDailyCell(
+      prev,
+      { value: Number(a.value), recordedAt: a.recordedAt ?? null, id: a.id ?? 0 },
+      { aggregation: cfg.aggregation, better: cfg.better }
+    );
 
-    let byTeam = byPart.get(partId);
-    if (!byTeam) {
-      byTeam = new Map();
-      byPart.set(partId, byTeam);
-    }
-
-    let byUser = byTeam.get(teamId);
-    if (!byUser) {
-      byUser = new Map();
-      byTeam.set(teamId, byUser);
-    }
-
-    const prev = byUser.get(uid);
-    if (prev == null) byUser.set(uid, val);
-    else byUser.set(uid, isTime ? Math.min(prev, val) : Math.max(prev, val));
+    byUser.set(a.userId, next);
   }
 
-  // Walk days and maintain running per-user best
-  // runningBest.get(partId).get(teamId).get(userId) => best so far
-  const runningBest = new Map<number, Map<number, Map<number, number>>>();
-  for (const p of parts) runningBest.set(p.id, new Map());
+  // running.get(partId).get(teamId).get(userId) => DailyCell (running state)
+  const running = new Map<number, Map<number, Map<number, DailyCell>>>();
+  for (const p of parts) running.set(p.id, new Map());
 
   const partsOut: TeamProgress["parts"] = {};
   const overallOut: TeamProgress["overall"] = [];
 
   for (const t of days) {
-    const today = dailyBest.get(t);
+    const today = dailyAgg.get(t);
 
     // ranksByPart: partId -> (teamId -> rank)
     const ranksByPart = new Map<number, Map<number, number>>();
 
     for (const p of parts) {
-      const partId = p.id;
-      const metric = p.metric;
-      const isTime = metric === "time";
-      const isTeamLogOnly = teamLogOnlyByPart.get(partId) ?? false;
+      const cfg = configurationByPart.get(p.id)!;
 
-      const rbPart = runningBest.get(partId)!;
+      const rbPart = running.get(p.id)!;
+      const todayTeams = today?.get(p.id); // Map<teamId, Map<userId, DailyCell>>
 
-      // Update runningBest for any (team,user) that has a value today
-      const todayTeams = today?.get(partId); // Map<teamId, Map<userId, bestToday>>
+      // Update running state for any (team,user) that has a value today
       if (todayTeams) {
         for (const [teamId, userMapToday] of todayTeams.entries()) {
-          let rbTeam = rbPart.get(teamId);
-          if (!rbTeam) {
-            rbTeam = new Map();
-            rbPart.set(teamId, rbTeam);
-          }
+          const rbTeam = ensureMap(rbPart, teamId, () => new Map());
 
-          for (const [uid, bestToday] of userMapToday.entries()) {
-            const prev = rbTeam.get(uid);
-            if (prev == null) rbTeam.set(uid, bestToday);
-            else rbTeam.set(uid, isTime ? Math.min(prev, bestToday) : Math.max(prev, bestToday));
+          for (const [uid, todayCell] of userMapToday.entries()) {
+            const prevRun = rbTeam.get(uid);
+            const nextRun = mergeRunningCell(prevRun, todayCell, {
+              aggregation: cfg.aggregation,
+              better: cfg.better,
+            });
+            if (nextRun) rbTeam.set(uid, nextRun);
           }
         }
       }
 
-      // Compute per-team value for this day/part 
+      // Compute per-team value for this day/part
       const values: Record<number, number | null> = {};
+
       for (const teamId of teamIds) {
-        const rbTeam = rbPart.get(teamId); // Map<userId, bestSoFar>
+        const rbTeam = rbPart.get(teamId);
+
         if (!rbTeam || rbTeam.size === 0) {
           values[teamId] = null;
           continue;
         }
 
-        if (isTeamLogOnly) {
-          // team best = min/max across users best-so-far
-          let teamBest: number | null = null;
-          for (const v of rbTeam.values()) {
-            if (teamBest == null) teamBest = v;
-            else teamBest = isTime ? Math.min(teamBest, v) : Math.max(teamBest, v);
-          }
-          values[teamId] = teamBest;
-        } else {
-          // team total = sum of users best-so-far
-          let sum = 0;
-          let count = 0;
-          for (const v of rbTeam.values()) {
-            sum += v;
-            count += 1;
+        if (cfg.isTeamLogOnly) {
+          // "Official score" mode: pick best across users running values
+          let best: number | null = null;
+
+          for (const s of rbTeam.values()) {
+            const v = cellToNumber(s);
+            if (v == null) continue;
+            best = best == null ? v : pickBetter(best, v, cfg.better);
           }
 
-          if (count === 0) {
-            values[teamId] = null;
-          } else if (isTime) {
-            values[teamId] = Math.round(sum / count);
-          } else {
-            values[teamId] = sum;
+          values[teamId] = best;
+        } else {
+          // "Behave like solo" mode: sum everyone's running contribution (cumulative)
+          let sum = 0;
+          let hasAny = false;
+
+          for (const s of rbTeam.values()) {
+            const v = cellToNumber(s);
+            if (v == null) continue;
+            sum += v;
+            hasAny = true;
           }
+
+          values[teamId] = hasAny ? sum : null;
         }
       }
 
       // Emit part series
-      const key = String(partId);
+      const key = String(p.id);
       if (!partsOut[key]) partsOut[key] = [];
       partsOut[key].push({ t, values });
 
-      // Compute ranks for this part/day
-      const ranked = teamIds
-        .map((teamId) => ({ teamId, total: values[teamId] }))
-        .filter((x): x is { teamId: number; total: number } => x.total !== null);
-
-      ranked.sort((a, b) => (isTime ? a.total - b.total : b.total - a.total));
-
-      const ranks = new Map<number, number>();
-      ranked.forEach((row, idx) => ranks.set(row.teamId, idx + 1));
-      ranksByPart.set(partId, ranks);
+      // Ranks for this day/part
+      const ranks = computeRanks(teamIds, values, cfg.better);
+      ranksByPart.set(p.id, ranks);
     }
 
-    // Overall points = sum of ranks across parts
+    // Overall points = sum of weighted points across parts
     const pointsByTeam = new Map<number, number>();
-    for (const ranks of ranksByPart.values()) {
-      for (const [teamId, rnk] of ranks.entries()) {
-        pointsByTeam.set(teamId, (pointsByTeam.get(teamId) ?? 0) + rnk);
-      }
+
+    for (const p of parts) {
+      const cfg = configurationByPart.get(p.id)!;
+      const ranks = ranksByPart.get(p.id);
+      if (!ranks) continue;
+
+      addPointsFromRanks({
+        pointsById: pointsByTeam,
+        ranks,
+        pointsMode: cfg.pointsMode,
+        weight: cfg.weight,
+      });
     }
 
     const overallValues: Record<number, number | null> = {};

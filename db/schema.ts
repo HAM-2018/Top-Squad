@@ -4,6 +4,17 @@ import { sql } from "drizzle-orm";
 //Team Roles
 export const teamRole = pgEnum("team_role", ["owner", "admin", "member"]);
 
+// Scoring Logic
+export const higherOrLower = pgEnum("higher_or_lower", ["higher", "lower"]);
+export const scoringBestOf = pgEnum("scoring_best_of", ["best", "latest"]);
+export const scoringPointsMode = pgEnum("scoring_points_mode", ["rank_low_wins", "rank_high_wins"]);
+export const scoringAggregation = pgEnum("scoring_aggregation", [
+  "best",   // pick best attempt (uses better + bestOf)
+  "sum",    // total
+  "avg",
+  "latest" 
+]);
+
 //How the challenge is measured
 export const challengeMetrics = pgEnum("challenge_metric", [
   "time",
@@ -90,6 +101,10 @@ export const challengePartsTable = pgTable("challenge_parts", {
   sortOrder: integer("sort_order").notNull().default(1),
   isTeamLogOnly: boolean("is_team_log_only").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  better: higherOrLower("better").notNull().default("higher"),
+  aggregation: scoringAggregation("aggregation").notNull().default("best"),
+  weight: integer("weight").notNull().default(1),
+  pointsMode: scoringPointsMode("points_mode").notNull().default("rank_low_wins"),
 });
 
 // Which team is doing what challenge

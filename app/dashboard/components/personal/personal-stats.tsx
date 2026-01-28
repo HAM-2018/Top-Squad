@@ -89,15 +89,15 @@ export default function IndividualChallenges({
       ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
       : "—"
     : "No data yet";
-
-  const value = hasData
-    ? isOverall
-      ? initialStats!.overall.myPoints !== null
-        ? `${initialStats!.overall.myPoints} pts`
-        : "—"
-      : selectedPart && selectedPart.myValue !== null
-      ? formatScore(selectedPart.myValue, selectedPart.metric, selectedPart.unit)
+  // Overall points only exists for multi-part overall.
+  const value = !hasData
+    ? "—"
+    : isOverall
+    ? initialStats!.overall.myPoints !== null
+      ? `${initialStats!.overall.myPoints} pts`
       : "—"
+    : selectedPart?.myValue !== null && selectedPart?.myValue !== undefined
+    ? formatScore(selectedPart.myValue, selectedPart.metric, selectedPart.unit)
     : "—";
 
   const rankingPercentage =
@@ -119,15 +119,15 @@ export default function IndividualChallenges({
     isMe: user !== null && r.userId === user,
   }));
 
-  const metric = hasData
-    ? isOverall
-      ? "reps"
-      : selectedPart?.metric ?? "time"
-    : "time";
-
+  const metric = hasData ? (isOverall ? "reps" : selectedPart?.metric ?? "time") : "time";
   const unit = hasData ? (isOverall ? null : selectedPart?.unit ?? null) : null;
 
-  const reversed = !isOverall && selectedPart?.metric === "time";
+  const reversed = !hasData
+    ? false
+    : isOverall
+    ? initialStats!.overall.pointsMode === "rank_low_wins"
+    : selectedPart?.better === "lower";
+
 
   //Line graph logic
   const linePoints = useMemo(() => {

@@ -1,5 +1,4 @@
 "use client";
-
 import MainMenu from "./components/main-menu";
 import Welcome from "./components/welcome";
 import MenuTitle from "./components/menu-title";

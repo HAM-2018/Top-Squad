@@ -44,9 +44,11 @@ export default function MainMenu({
                 <MenuItem href="/dashboard/account">
                     Account
                 </MenuItem>
+                {/*
                 <MenuItem href="/dashboard/settings">
                     Settings
                 </MenuItem>
+                */}
             </div>
             <footer className="flex gap-2 items-center">
                 <Avatar>

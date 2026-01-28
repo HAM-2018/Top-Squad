@@ -25,34 +25,34 @@ export default function TeamChallenges({
   initialStats: TeamChallengeStats | null;
   teamProgress?: TeamProgress | null;
 }) {
-  const [selected, setSelected] = useState<string>(
-    initialStats?.parts?.length === 1
-    ? String(initialStats.parts[0].partId)
-    : "overall"
-  );
-
-  //  hooks must run
   const parts = useMemo(() => initialStats?.parts ?? [], [initialStats]);
+  const hasData = parts.length > 0;
   const hasMultipleParts = parts.length > 1;
 
-  //  selected part 
-  const selectedPart = useMemo(() => {
-    if (selected === "overall") return null;
-    return parts.find((p) => String(p.partId) === selected) ?? null;
-  }, [selected, parts]);
-  
+  const [selected, setSelected] = useState<string>(() => {
+    if (!hasData) return "";
+    if (parts.length === 1) return String(parts[0].partId);
+    return "overall";
+  });
 
-  const isOverall = selected === "overall";
-  // teams for avatars
+  const selectedPart = useMemo(() => {
+    if (!hasData) return null;
+    if (hasMultipleParts) {
+      if (selected === "overall") return null;
+      return parts.find((p) => String(p.partId) === selected) ?? null;
+    }
+    return parts[0] ?? null;
+  }, [hasData, hasMultipleParts, parts, selected]);
+
+  const isOverall = hasData && hasMultipleParts && selected === "overall";
+
   const teams = useMemo(() => {
     if (!initialStats) return [];
     return isOverall ? initialStats.overall.teams : selectedPart?.teams ?? [];
   }, [initialStats, isOverall, selectedPart]);
 
-  // bar chart data (null-safe)
   const graphRows = useMemo(() => {
     if (!initialStats) return [];
-
     if (isOverall) {
       return initialStats.overall.chartRows.map((r) => ({
         name: r.name,
@@ -60,9 +60,7 @@ export default function TeamChallenges({
         isMyTeam: r.isMyTeam,
       }));
     }
-
     if (!selectedPart) return [];
-
     return selectedPart.chartRows.map((r) => ({
       name: r.name,
       value: r.time,
@@ -70,28 +68,22 @@ export default function TeamChallenges({
     }));
   }, [initialStats, isOverall, selectedPart]);
 
-  const graphMetric = isOverall ? "reps" : selectedPart?.metric ?? "reps";
-  const graphUnit = isOverall ? null : selectedPart?.unit ?? null;
+  const graphMetric = hasData ? (isOverall ? "reps" : selectedPart?.metric ?? "reps") : "reps";
+  const graphUnit = hasData ? (isOverall ? null : selectedPart?.unit ?? null) : null;
 
-  //  line graph logic
   const linePoints = useMemo(() => {
     if (!teamProgress) return [];
-
-    if (selected === "overall") return teamProgress.overall;
-
-    // TeamProgress.parts Record<string, TeamProgressPoint[]>
+    if (!selected) return [];
+    if (isOverall) return teamProgress.overall;
     return teamProgress.parts[selected] ?? [];
-  }, [teamProgress, selected]);
+  }, [teamProgress, isOverall, selected]);
 
-  // line chart rows always includes t values can be null
   const lineData = useMemo(() => {
     return linePoints.map((p) => {
       const row: Record<string, number | string | null> = { t: p.t };
-
       for (const [teamId, val] of Object.entries(p.values)) {
         row[`team_${teamId}`] = val;
       }
-
       return row as { t: string } & Record<string, number | string | null>;
     });
   }, [linePoints]);
@@ -104,44 +96,33 @@ export default function TeamChallenges({
     }));
   }, [teamProgress]);
 
-  // y-axis reversal only time should be reversed 
-  const reversed = isOverall || selectedPart?.metric === "time";
+  const reversed = !hasData
+    ? false
+    : isOverall
+    ? initialStats!.overall.pointsMode === "rank_low_wins"
+    : selectedPart?.better === "lower";
 
   const firstPlaceTeam = useMemo(() => {
-    const ranked = teams.filter((t) => t.rank !== null) as Array<
-      typeof teams[number] & { rank: number }
-    >;
-
+    const ranked = teams.filter((t) => t.rank !== null) as Array<typeof teams[number] & { rank: number }>;
     if (ranked.length === 0) return null;
-
-    // rank 1 wins
     return ranked.reduce((best, cur) => (cur.rank < best.rank ? cur : best), ranked[0]);
   }, [teams]);
 
   const firstPlaceScore = useMemo(() => {
     if (!firstPlaceTeam) return "—";
-
     if (isOverall) {
-      // overall uses points
       const pts = (firstPlaceTeam as any).points as number | null | undefined;
       return pts != null ? `${pts} pts` : "—";
     }
-
-    // part uses value + metric formatting
     const val = (firstPlaceTeam as any).value as number | null | undefined;
-    return val != null && selectedPart
-      ? formatScore(val, selectedPart.metric, selectedPart.unit)
-      : "—";
+    return val != null && selectedPart ? formatScore(val, selectedPart.metric, selectedPart.unit) : "—";
   }, [firstPlaceTeam, isOverall, selectedPart]);
 
   if (!initialStats) {
     return <div className="text-muted-foreground">No team challenge data available yet.</div>;
   }
 
-  // TEAM RANK / TOTAL TEAMS
-  const myRank = isOverall
-    ? initialStats.overall.myTeamRank
-    : selectedPart?.myTeamRank ?? null;
+  const myRank = isOverall ? initialStats.overall.myTeamRank : selectedPart?.myTeamRank ?? null;
 
   const label = isOverall
     ? "Overall"
@@ -154,13 +135,8 @@ export default function TeamChallenges({
       ? `${initialStats.overall.myTeamPoints} pts`
       : "—"
     : selectedPart && selectedPart.myTeamValue !== null
-    ? formatScore(
-        selectedPart.myTeamValue,
-        selectedPart.metric,
-        selectedPart.unit
-      )
+    ? formatScore(selectedPart.myTeamValue, selectedPart.metric, selectedPart.unit)
     : "—";
-
 
   return (
     <>
@@ -173,41 +149,40 @@ export default function TeamChallenges({
           </CardHeader>
 
           <CardContent className="flex flex-col gap-3 pt-0">
-            {/* Dropdown */}
-            <Select value={selected} onValueChange={setSelected}>
+            <Select
+              value={
+                !hasData
+                  ? ""
+                  : hasMultipleParts
+                  ? (selected === "overall" || parts.some((p) => String(p.partId) === selected) ? selected : "overall")
+                  : String(parts[0]?.partId ?? "")
+              }
+              onValueChange={setSelected}
+              disabled={!hasData}
+            >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select event" />
+                <SelectValue placeholder={hasData ? "Select event" : "No events yet"} />
               </SelectTrigger>
               <SelectContent>
-                {hasMultipleParts && (
-                  <SelectItem value="overall">Overall</SelectItem>
-                )}
-                {parts.map((p) => (
+                {hasData && hasMultipleParts ? <SelectItem value="overall">Overall</SelectItem> : null}
+                {hasData ? parts.map((p) => (
                   <SelectItem key={p.partId} value={String(p.partId)}>
                     {p.partName}
                   </SelectItem>
-                ))}
+                )) : null}
               </SelectContent>
             </Select>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm uppercase tracking-wide text-muted-foreground">
-                Ranking
-              </span>
-              <span className="text-3xl font-semibold">
-                {myRank !== null ? `#${myRank}` : "—"}
-              </span>
+              <span className="text-sm uppercase tracking-wide text-muted-foreground">Ranking</span>
+              <span className="text-3xl font-semibold">{myRank !== null ? `#${myRank}` : "—"}</span>
             </div>
 
             <div className="h-px bg-border/60" />
 
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm uppercase tracking-wide text-muted-foreground">
-                {label}
-              </span>
-              <span className="font-mono text-4xl font-bold tabular-nums">
-                {value}
-              </span>
+              <span className="text-sm uppercase tracking-wide text-muted-foreground">{label}</span>
+              <span className="font-mono text-4xl font-bold tabular-nums">{value}</span>
             </div>
           </CardContent>
         </Card>
@@ -220,30 +195,23 @@ export default function TeamChallenges({
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
-            {teams.map((team) => (
-              <TooltipProvider key={team.teamName}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Avatar>
-                      {team.avatarUrl ? (
-                        <AvatarImage
-                        src={team.avatarUrl ?? ""}
-                        alt={team.teamName} 
-                        />
-                      ) : null}
-                      <AvatarFallback className="font-semibold">
-                        {team.teamName.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent>{team.teamName}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ))}
+              {teams.map((team) => (
+                <TooltipProvider key={team.teamName}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar>
+                        {team.avatarUrl ? <AvatarImage src={team.avatarUrl ?? ""} alt={team.teamName} /> : null}
+                        <AvatarFallback className="font-semibold">
+                          {team.teamName.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent>{team.teamName}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ))}
             </div>
-            <div className=" text-muted-foreground pt-4">
-              Total: {teams.length} 
-            </div>
+            <div className=" text-muted-foreground pt-4">Total: {teams.length}</div>
           </CardContent>
         </Card>
 
@@ -261,10 +229,7 @@ export default function TeamChallenges({
               <>
                 <Avatar>
                   {firstPlaceTeam.avatarUrl ? (
-                    <AvatarImage
-                    src={firstPlaceTeam.avatarUrl ?? ""}
-                    alt={firstPlaceTeam.teamName} 
-                    />
+                    <AvatarImage src={firstPlaceTeam.avatarUrl ?? ""} alt={firstPlaceTeam.teamName} />
                   ) : null}
                   <AvatarFallback className="font-semibold">
                     {firstPlaceTeam.teamName.slice(0, 2).toUpperCase()}
@@ -272,9 +237,7 @@ export default function TeamChallenges({
                 </Avatar>
 
                 <div className="min-w-0">
-                  <div className="text-2xl font-semibold truncate">
-                    {firstPlaceTeam.teamName}
-                  </div>
+                  <div className="text-2xl font-semibold truncate">{firstPlaceTeam.teamName}</div>
                   <div className="text-sm text-muted-foreground">
                     {isOverall ? "Overall leader" : "Event leader"} • {firstPlaceScore}
                   </div>
@@ -298,29 +261,25 @@ export default function TeamChallenges({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <TeamStatsGraph
-          rows={graphRows}
-          metric={graphMetric}
-          unit={graphUnit}
-          isOverall={isOverall} 
-          />
+          <TeamStatsGraph rows={graphRows} metric={graphMetric} unit={graphUnit} isOverall={isOverall} />
         </CardContent>
       </Card>
+
       <Card className="my-4">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TimerIcon />
-            <span>Current Team scores</span>
+            <span>Progress over time</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <TeamLineGraph 
-          data={lineData} 
-          teamKeys={teamKeys} 
-          reversed={reversed} 
-          metric={graphMetric} 
-          unit={graphUnit} 
-          isOverall={isOverall}
+          <TeamLineGraph
+            data={lineData}
+            teamKeys={teamKeys}
+            reversed={reversed}
+            metric={graphMetric}
+            unit={graphUnit}
+            isOverall={isOverall}
           />
         </CardContent>
       </Card>

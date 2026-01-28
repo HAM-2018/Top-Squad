@@ -10,6 +10,7 @@ export type PartStats = {
   partName: string;
   metric: "time" | "distance" | "reps" | "weight";
   unit: string | null;
+  better: "higher" | "lower";
   myRank: number | null;
   myValue: number | null;
   totalCompetitors: number;
@@ -21,10 +22,14 @@ export type PartStats = {
 export type OverallStats = {
   myRank: number | null;
   myPoints: number | null;
-  totalCompetitors: number;
   firstPlace: { name: string; points: number } | null;
-  chartRows: ChartRow[]; 
+  myValue: number | null;
+  firstPlaceValue: { name: string; value: number } | null;
+  totalCompetitors: number;
+  chartRows: ChartRow[];
+  pointsMode: "rank_low_wins" | "rank_high_wins";
 };
+
 
 export type MultiPartChallengeStats = {
   challengeId: number;

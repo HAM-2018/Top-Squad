@@ -25,8 +25,6 @@ export default function TeamLineGraph({
   if (!data.length) return <div className="text-muted-foreground">No history yet.</div>;
 
   const format = (v: number) => (isOverall ? `${v} pts` : formatScore(v, metric, unit));
-  
-
 
   return (
     <ResponsiveContainer height={350} width="100%">
@@ -36,7 +34,7 @@ export default function TeamLineGraph({
         <YAxis 
         fontSize={12}
         allowDecimals={false}
-        reversed={reversed}
+        reversed={isOverall ? false : reversed}
         tickFormatter={(v) => format(v)}
         />
         <Tooltip formatter={(v) => typeof v === "number" ? format(v) : v}

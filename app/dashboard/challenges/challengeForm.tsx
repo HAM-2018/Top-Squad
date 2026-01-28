@@ -1,5 +1,4 @@
 "use client";
-
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +33,7 @@ import {
 import z from "zod";
 import { challengeMetricValues } from "@/db/schema";
 import { ChallengeWithParts } from "@/types/individualchallengeStats";
+import { aggregationValues, betterValues, pointsModeValues } from "@/types/scoring";
 
 type Teams = {
   id: number;
@@ -47,7 +47,12 @@ type Props = {
   challenges?: ChallengeWithParts[];
 };
 
-export default function ChallengeForm({ onSubmit, defaultValues, teams, challenges = [], }: Props) {
+export default function ChallengeForm({
+  onSubmit,
+  defaultValues,
+  teams,
+  challenges = [],
+}: Props) {
   const form = useForm<z.infer<typeof createChallengeSchema>>({
     resolver: zodResolver(createChallengeSchema) as any,
     defaultValues: {
@@ -58,6 +63,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
       isTeamBased: false,
       groupId: undefined,
       teamId: undefined,
+      pointsMode: "rank_low_wins",
       parts: [
         {
           name: "",
@@ -66,6 +72,10 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
           unit: "",
           sortOrder: 1,
           isTeamLogOnly: false,
+          aggregation: "best",
+          better: "lower",
+          pointsMode: "rank_low_wins",
+          weight: 1,
         },
       ],
       ...defaultValues,
@@ -97,6 +107,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
       isTeamBased: false,
       groupId: undefined,
       teamId: undefined,
+      pointsMode: "rank_low_wins",
       parts: [
         {
           name: "",
@@ -105,6 +116,10 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
           unit: "",
           sortOrder: 1,
           isTeamLogOnly: false,
+          aggregation: "best",
+          better: "lower",
+          pointsMode: "rank_low_wins",
+          weight: 1,
         },
       ],
     });
@@ -146,7 +161,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                   name="groupId"
                   render={({ field }) => (
                     <FormItem className="w-full">
-                      <FormLabel>Group</FormLabel>
+                      <FormLabel>Team</FormLabel>
                       <FormControl>
                         <Select
                           onValueChange={(val) =>
@@ -155,14 +170,11 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                           value={field.value ? field.value.toString() : ""}
                         >
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a group to participate in your challenge" />
+                            <SelectValue placeholder="Select a Team to participate in your challenge" />
                           </SelectTrigger>
                           <SelectContent>
                             {teams.map((team) => (
-                              <SelectItem
-                                key={team.id}
-                                value={team.id.toString()}
-                              >
+                              <SelectItem key={team.id} value={team.id.toString()}>
                                 {team.name}
                               </SelectItem>
                             ))}
@@ -208,11 +220,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -246,11 +254,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -267,7 +271,6 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                   )}
                 />
 
-                {/* Team-based switch */}
                 <FormField
                   control={form.control}
                   name="isTeamBased"
@@ -276,22 +279,17 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                       <div className="space-y-0.5">
                         <FormLabel>Team-based challenge</FormLabel>
                         <p className="text-xs text-muted-foreground">
-                          If enabled, this challenge will be tracked at the team
-                          level.
+                          If enabled, this challenge will be tracked at the team level.
                         </p>
                       </div>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* Team Select when team switch is toggled */}
                 {isTeamBased && (
                   <FormField
                     control={form.control}
@@ -301,20 +299,15 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                         <FormLabel>Select Team</FormLabel>
                         <FormControl>
                           <Select
-                            onValueChange={(val) =>
-                              field.onChange(parseInt(val))
-                            }
+                            onValueChange={(val) => field.onChange(parseInt(val))}
                             value={field.value ? field.value.toString() : ""}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue placeholder="Select a team" />
                             </SelectTrigger>
                             <SelectContent>
                               {teams.map((team) => (
-                                <SelectItem
-                                  key={team.id}
-                                  value={team.id.toString()}
-                                >
+                                <SelectItem key={team.id} value={team.id.toString()}>
                                   {team.name}
                                 </SelectItem>
                               ))}
@@ -327,7 +320,6 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                   />
                 )}
 
-                {/* Challenge Parts */}
                 <div className="md:col-span-2 space-y-4 mt-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Events</h3>
@@ -343,6 +335,10 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                           unit: "",
                           sortOrder: (partFields.length || 0) + 1,
                           isTeamLogOnly: false,
+                          aggregation: "best",
+                          better: "higher",
+                          pointsMode: "rank_low_wins",
+                          weight: 1,
                         })
                       }
                     >
@@ -353,18 +349,18 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
 
                   <div className="space-y-3">
                     {partFields.map((pf, index) => (
-                      <div key={pf.id} className="space-y-2">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                          {/* Event Name */}
+                      <div key={pf.id} className="space-y-2 rounded-md border p-3">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                           <FormField
                             control={form.control}
                             name={`parts.${index}.name` as const}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="md:col-span-4">
                                 <FormLabel>Event Name</FormLabel>
                                 <FormControl>
                                   <Input
                                     {...field}
+                                    className="h-10 w-full"
                                     placeholder="e.g. Push-ups, 1-mile run"
                                   />
                                 </FormControl>
@@ -377,21 +373,17 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                             control={form.control}
                             name={`parts.${index}.metric` as const}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="md:col-span-2">
                                 <FormLabel>Metric</FormLabel>
                                 <FormControl>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                  >
-                                    <SelectTrigger>
+                                  <Select value={field.value} onValueChange={field.onChange}>
+                                    <SelectTrigger className="h-10 w-full">
                                       <SelectValue placeholder="Select metric" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {challengeMetricValues.map((metric) => (
                                         <SelectItem key={metric} value={metric}>
-                                          {metric.charAt(0).toUpperCase() +
-                                            metric.slice(1)}
+                                          {metric.charAt(0).toUpperCase() + metric.slice(1)}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -406,10 +398,11 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                             control={form.control}
                             name={`parts.${index}.targetValue` as const}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="md:col-span-3">
                                 <FormLabel>Target (optional)</FormLabel>
                                 <FormControl>
                                   <Input
+                                    className="h-10 w-full"
                                     type="number"
                                     placeholder="e.g. 50"
                                     value={field.value ?? ""}
@@ -427,8 +420,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                             )}
                           />
 
-                          {/* Unit + remove button */}
-                          <div className="flex gap-2">
+                          <div className="md:col-span-3 flex gap-2 items-end">
                             <FormField
                               control={form.control}
                               name={`parts.${index}.unit` as const}
@@ -438,42 +430,112 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                                   <FormControl>
                                     <Input
                                       {...field}
-                                      placeholder="reps, time, meters..."
+                                      className="h-10 w-full"
+                                      placeholder="miles, meters, etc.."
                                     />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
                             />
-
-                            {partFields.length > 1 && (
+                            {partFields.length > 1 ? (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="self-end mb-0.5"
+                                className="h-10 w-10 shrink-0"
                                 onClick={() => remove(index)}
+                                aria-label="Remove part"
                               >
                                 <Trash2Icon className="w-4 h-4" />
                               </Button>
-                            )}
+                            ) : null}
                           </div>
+
+                          <FormField
+                            control={form.control}
+                            name={`parts.${index}.aggregation` as const}
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-3">
+                                <FormLabel>How will this event be scored?</FormLabel>
+                                <FormControl>
+                                  <Select value={field.value} onValueChange={field.onChange}>
+                                    <SelectTrigger className="h-10 w-full">
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {aggregationValues.map((v) => (
+                                        <SelectItem key={v} value={v}>
+                                          {v.toUpperCase()}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`parts.${index}.better` as const}
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-3">
+                                <FormLabel>How do you win?</FormLabel>
+                                <FormControl>
+                                  <Select value={field.value} onValueChange={field.onChange}>
+                                    <SelectTrigger className="h-10 w-full">
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {betterValues.map((v) => (
+                                        <SelectItem key={v} value={v}>
+                                          {v === "higher" ? "Higher is better" : "Lower is better"}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`parts.${index}.weight` as const}
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel>Weight</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    className="h-10 w-full"
+                                    type="number"
+                                    min={1}
+                                    value={field.value ?? 1}
+                                    onChange={(e) =>
+                                      field.onChange(e.target.value === "" ? 1 : Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
-                        {/*slide-down toggle for team log only */}
+
                         <div
                           className={cn(
                             "overflow-hidden transition-all duration-200 ease-in-out",
                             isTeamBased ? "max-h-24 opacity-100" : "max-h-0 opacity-0"
                           )}
                         >
-                          <div className="rounded-md border p-3 flex items-center justify-between">
+                          <div className="rounded-md border p-3 flex items-center justify-between mt-2">
                             <div className="space-y-0.5">
-                              <p className="text-sm font-medium">
-                                Event completed as a Team?
-                              </p>
+                              <p className="text-sm font-medium">Event completed as a Team?</p>
                               <p className="text-xs text-muted-foreground">
-                                If enabled, only admins/owners can record a
-                                single official team score for this event.
+                                If enabled, only admins/owners can record a single official team score for this event.
                               </p>
                             </div>
 
@@ -497,6 +559,35 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                       </div>
                     ))}
                   </div>
+
+                  {partFields.length > 1 ? (
+                    <div className="rounded-md border p-3">
+                      <FormField
+                        control={form.control}
+                        name="pointsMode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Overall points mode</FormLabel>
+                            <FormControl>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger className="h-10 w-full">
+                                  <SelectValue placeholder="Select points mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {pointsModeValues.map((v) => (
+                                    <SelectItem key={v} value={v}>
+                                      {v === "rank_low_wins" ? "Low points wins" : "High points wins"}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </fieldset>
 
@@ -510,7 +601,6 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
         </CardContent>
       </Card>
 
-      {/* Challenges list */}
       <Card>
         <CardHeader className="pb-2 border-b border-rose-500">
           <CardTitle className="flex items-center justify-between text-xl">
@@ -542,7 +632,7 @@ export default function ChallengeForm({ onSubmit, defaultValues, teams, challeng
                           <span className="text-[10px] px-2 py-0.5 rounded-full border text-muted-foreground shrink-0">
                             {c.groupName}
                           </span>
-                        ): null}
+                        ) : null}
                       </div>
 
                       <div className="text-xs text-muted-foreground mt-1 truncate">

@@ -6,18 +6,21 @@ import {
   teamChallengesTable,
   teamMembersTable,
   teamsTable,
-  usersTable,
 } from "@/db/schema";
-import { and, asc, eq, inArray, min, max } from "drizzle-orm";
+import { pickAggregatedValue } from "@/lib/scoringRules";
+import { and, asc, desc, eq, inArray, max, sql } from "drizzle-orm";
+
+type Agg = "best" | "sum" | "avg" | "latest";
+type Better = "higher" | "lower";
+type PointsMode = "rank_low_wins" | "rank_high_wins";
 
 export async function getTeamChallengeStats({
   userId,
   teamChallengeId,
 }: {
-  userId: number
+  userId: number;
   teamChallengeId: number;
 }) {
-
   if (!userId) throw new Error("Unauthorized");
 
   const [selected] = await db
@@ -30,17 +33,13 @@ export async function getTeamChallengeStats({
     .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
     .innerJoin(
       teamMembersTable,
-      and(
-        eq(teamMembersTable.teamId, teamChallengesTable.teamId),
-        eq(teamMembersTable.userId, userId)
-      )
+      and(eq(teamMembersTable.teamId, teamChallengesTable.teamId), eq(teamMembersTable.userId, userId))
     )
     .where(and(eq(teamChallengesTable.id, teamChallengeId), eq(challengeTable.isTeamBased, true)))
     .limit(1);
 
   if (!selected) return null;
 
-  // all teams participating in this challenge
   const teamChallenges = await db
     .select({
       teamChallengeId: teamChallengesTable.id,
@@ -53,13 +52,13 @@ export async function getTeamChallengeStats({
     .where(eq(teamChallengesTable.challengeId, selected.challengeId));
 
   const teamChallengeIds = teamChallenges.map((t) => t.teamChallengeId);
+  const teamIds = teamChallenges.map((t) => t.teamId);
 
   const teamMeta = new Map<number, { name: string; avatarUrl: string | null }>();
   teamChallenges.forEach((t) =>
     teamMeta.set(t.teamId, { name: t.teamName, avatarUrl: t.teamAvatarUrl ?? null })
   );
 
-  // parts
   const parts = await db
     .select({
       id: challengePartsTable.id,
@@ -68,12 +67,15 @@ export async function getTeamChallengeStats({
       unit: challengePartsTable.unit,
       sortOrder: challengePartsTable.sortOrder,
       isTeamLogOnly: challengePartsTable.isTeamLogOnly,
+      aggregation: challengePartsTable.aggregation,
+      better: challengePartsTable.better,
+      pointsMode: challengePartsTable.pointsMode,
+      weight: challengePartsTable.weight,
     })
     .from(challengePartsTable)
     .where(eq(challengePartsTable.challengeId, selected.challengeId))
     .orderBy(asc(challengePartsTable.sortOrder));
 
-  // seed ALL teams so overall includes everyone even with no attempts
   const pointsByTeam = new Map<number, number>();
   for (const t of teamChallenges) pointsByTeam.set(t.teamId, 0);
 
@@ -83,6 +85,10 @@ export async function getTeamChallengeStats({
     metric: "time" | "distance" | "reps" | "weight";
     unit: string | null;
     isTeamLogOnly: boolean;
+    aggregation: Agg;
+    better: Better;
+    pointsMode: PointsMode;
+    weight: number;
     myTeamRank: number | null;
     myTeamValue: number | null;
     totalTeams: number;
@@ -104,22 +110,165 @@ export async function getTeamChallengeStats({
   }> = [];
 
   for (const part of parts) {
-    const isTime = part.metric === "time";
-    const bestExpr = isTime
-      ? min(challengeAttemptsTable.value)
-      : max(challengeAttemptsTable.value);
+    const aggregation = (part.aggregation ?? "best") as Agg;
+    const better = (part.better ?? "higher") as Better;
+    const pointsMode = (part.pointsMode ?? "rank_low_wins") as PointsMode;
+    const weight = Number(part.weight ?? 1);
 
-    const perUserBest = await db
+    if (part.isTeamLogOnly) {
+      const rows = await db
+        .select({
+          teamId: teamChallengesTable.teamId,
+          value: challengeAttemptsTable.value,
+          recordedAt: challengeAttemptsTable.recordedAt,
+          id: challengeAttemptsTable.id,
+        })
+        .from(challengeAttemptsTable)
+        .innerJoin(teamChallengesTable, eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId))
+        .where(
+          and(
+            inArray(challengeAttemptsTable.teamChallengeId, teamChallengeIds),
+            eq(challengeAttemptsTable.challengePartId, part.id)
+          )
+        );
+
+      const teamValue = new Map<number, number | null>();
+
+      if (aggregation === "sum" || aggregation === "avg") {
+        const sumByTeam = new Map<number, number>();
+        const countByTeam = new Map<number, number>();
+
+        for (const r of rows) {
+          if (r.value == null) continue;
+          const v = Number(r.value);
+          sumByTeam.set(r.teamId, (sumByTeam.get(r.teamId) ?? 0) + v);
+          countByTeam.set(r.teamId, (countByTeam.get(r.teamId) ?? 0) + 1);
+        }
+
+        for (const tc of teamChallenges) {
+          const s = sumByTeam.get(tc.teamId);
+          if (s == null) teamValue.set(tc.teamId, null);
+          else if (aggregation === "sum") teamValue.set(tc.teamId, s);
+          else {
+            const c = countByTeam.get(tc.teamId) ?? 0;
+            teamValue.set(tc.teamId, c ? s / c : null);
+          }
+        }
+      } else if (aggregation === "latest") {
+        const latestByTeam = new Map<number, { recordedAt: Date; id: number; value: number }>();
+        for (const r of rows) {
+          if (r.value == null || !r.recordedAt) continue;
+          const v = Number(r.value);
+          const cur = latestByTeam.get(r.teamId);
+          if (!cur) {
+            latestByTeam.set(r.teamId, { recordedAt: r.recordedAt, id: r.id, value: v });
+          } else {
+            const curT = cur.recordedAt.getTime();
+            const nxtT = r.recordedAt.getTime();
+            if (nxtT > curT || (nxtT === curT && r.id > cur.id)) {
+              latestByTeam.set(r.teamId, { recordedAt: r.recordedAt, id: r.id, value: v });
+            }
+          }
+        }
+        for (const tc of teamChallenges) {
+          teamValue.set(tc.teamId, latestByTeam.get(tc.teamId)?.value ?? null);
+        }
+      } else {
+        const bestByTeam = new Map<number, number>();
+        const isLowerBetter = better === "lower";
+        for (const r of rows) {
+          if (r.value == null) continue;
+          const v = Number(r.value);
+          const cur = bestByTeam.get(r.teamId);
+          if (cur == null) bestByTeam.set(r.teamId, v);
+          else bestByTeam.set(r.teamId, isLowerBetter ? Math.min(cur, v) : Math.max(cur, v));
+        }
+        for (const tc of teamChallenges) {
+          teamValue.set(tc.teamId, bestByTeam.get(tc.teamId) ?? null);
+        }
+      }
+
+      const leaderboard = teamChallenges
+        .map((tc) => {
+          const meta = teamMeta.get(tc.teamId);
+          return {
+            teamId: tc.teamId,
+            name: meta?.name ?? `Team ${tc.teamId}`,
+            avatarUrl: meta?.avatarUrl ?? null,
+            total: teamValue.get(tc.teamId) ?? null,
+            isMyTeam: tc.teamId === selected.myTeamId,
+          };
+        })
+        .sort((a, b) => {
+          if (a.total === null && b.total === null) return 0;
+          if (a.total === null) return 1;
+          if (b.total === null) return -1;
+          return better === "lower" ? a.total - b.total : b.total - a.total;
+        });
+
+      const scored = leaderboard.filter((t) => t.total !== null) as Array<
+        Omit<(typeof leaderboard)[number], "total"> & { total: number }
+      >;
+
+      const rankByTeam = new Map<number, number>();
+      scored.forEach((t, idx) => rankByTeam.set(t.teamId, idx + 1));
+
+      const myRow = leaderboard.find((t) => t.teamId === selected.myTeamId) ?? null;
+      const myTeamValue = myRow?.total ?? null;
+      const myTeamRank = myRow?.total === null ? null : (rankByTeam.get(selected.myTeamId) ?? null);
+
+      const n = scored.length;
+      scored.forEach((t, idx) => {
+        const rank = idx + 1;
+        const points = pointsMode === "rank_low_wins" ? rank : (n - rank + 1);
+        pointsByTeam.set(t.teamId, (pointsByTeam.get(t.teamId) ?? 0) + points * weight);
+      });
+
+      partStats.push({
+        partId: part.id,
+        partName: part.name,
+        metric: part.metric,
+        unit: part.unit ?? null,
+        isTeamLogOnly: part.isTeamLogOnly,
+        aggregation,
+        better,
+        pointsMode,
+        weight,
+        myTeamRank,
+        myTeamValue,
+        totalTeams: leaderboard.length,
+        teams: leaderboard.map((t) => ({
+          teamId: t.teamId,
+          teamName: t.name,
+          avatarUrl: t.avatarUrl,
+          rank: rankByTeam.get(t.teamId) ?? null,
+          value: t.total,
+          isMyTeam: t.isMyTeam,
+        })),
+        chartRows: scored.slice(0, 10).map((t) => ({
+          teamId: t.teamId,
+          name: t.name,
+          avatarUrl: t.avatarUrl,
+          time: t.total,
+          isMyTeam: t.isMyTeam,
+        })),
+      });
+
+      continue;
+    }
+
+    const perUserAgg = await db
       .select({
         teamId: teamChallengesTable.teamId,
         userId: challengeAttemptsTable.userId,
-        bestValue: bestExpr,
+        sumValue: sql<number | null>`sum(${challengeAttemptsTable.value})`,
+        avgValue: sql<number | null>`avg(${challengeAttemptsTable.value})`,
+        minValue: sql<number | null>`min(${challengeAttemptsTable.value})`,
+        maxValue: sql<number | null>`max(${challengeAttemptsTable.value})`,
+        latestAt: max(challengeAttemptsTable.recordedAt),
       })
       .from(challengeAttemptsTable)
-      .innerJoin(
-        teamChallengesTable,
-        eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId)
-      )
+      .innerJoin(teamChallengesTable, eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId))
       .where(
         and(
           inArray(challengeAttemptsTable.teamChallengeId, teamChallengeIds),
@@ -128,36 +277,90 @@ export async function getTeamChallengeStats({
       )
       .groupBy(teamChallengesTable.teamId, challengeAttemptsTable.userId);
 
-    // roll up to team totals (ONLY teams with attempts end up here)
+    const latestRows = aggregation === "latest"
+      ? await db
+          .select({
+            teamId: teamChallengesTable.teamId,
+            userId: challengeAttemptsTable.userId,
+            value: challengeAttemptsTable.value,
+            recordedAt: challengeAttemptsTable.recordedAt,
+            id: challengeAttemptsTable.id,
+          })
+          .from(challengeAttemptsTable)
+          .innerJoin(teamChallengesTable, eq(teamChallengesTable.id, challengeAttemptsTable.teamChallengeId))
+          .where(
+            and(
+              inArray(challengeAttemptsTable.teamChallengeId, teamChallengeIds),
+              eq(challengeAttemptsTable.challengePartId, part.id)
+            )
+          )
+          .orderBy(desc(challengeAttemptsTable.recordedAt), desc(challengeAttemptsTable.id))
+      : [];
+
+    const latestPicked = new Map<string, number>();
+    if (aggregation === "latest") {
+      const seen = new Set<string>();
+      for (const r of latestRows) {
+        if (r.value == null || !r.recordedAt) continue;
+        const key = `${r.teamId}:${r.userId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        latestPicked.set(key, Number(r.value));
+      }
+    }
+
+    const userValueByTeam = new Map<number, Map<number, number>>();
+    const isLowerBetter = better === "lower";
+
+    for (const row of perUserAgg) {
+      const v = pickAggregatedValue(
+        { aggregation, better },
+        {
+          minV: row.minValue == null ? null : Number(row.minValue),
+          maxV: row.maxValue == null ? null : Number(row.maxValue),
+          sumV: row.sumValue == null ? null : Number(row.sumValue),
+          avgV: row.avgValue == null ? null : Number(row.avgValue),
+          latestV:
+            aggregation === "latest"
+              ? latestPicked.get(`${row.teamId}:${row.userId}`) ?? null
+              : null,
+        }
+      );
+
+      if (v == null) continue;
+
+      let byUser = userValueByTeam.get(row.teamId);
+      if (!byUser) {
+        byUser = new Map();
+        userValueByTeam.set(row.teamId, byUser);
+      }
+      byUser.set(row.userId, v);
+    }
+
     const teamTotals = new Map<number, number>();
     const teamCounts = new Map<number, number>();
 
-    for (const row of perUserBest) {
-      if (row.bestValue === null) continue;
+    for (const tc of teamChallenges) {
+      const byUser = userValueByTeam.get(tc.teamId);
+      if (!byUser || byUser.size === 0) continue;
 
-      const teamId = row.teamId;
-      const v = Number(row.bestValue);
+      let sum = 0;
+      let count = 0;
+      for (const v of byUser.values()) {
+        sum += v;
+        count += 1;
+      }
 
-      if (part.isTeamLogOnly) {
-        const cur = teamTotals.get(teamId);
-        if (cur === undefined) teamTotals.set(teamId, v);
-        else teamTotals.set(teamId, isTime ? Math.min(cur, v) : Math.max(cur, v));
+      if (count === 0) continue;
+
+      if (part.metric === "time") {
+        teamTotals.set(tc.teamId, sum / count);
+        teamCounts.set(tc.teamId, count);
       } else {
-        // time = average of member bests, others = sum
-        teamTotals.set(teamId, (teamTotals.get(teamId) ?? 0) + v);
-        if (isTime) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1);
+        teamTotals.set(tc.teamId, sum);
       }
     }
 
-    // average for time (non-team-log-only)
-    if (isTime && !part.isTeamLogOnly) {
-      for (const [teamId, sum] of teamTotals.entries()) {
-        const count = teamCounts.get(teamId) ?? 1;
-        teamTotals.set(teamId, Math.round(sum / count));
-      }
-    }
-
-    // leaderboard from ALL teams (null if no attempts)
     const leaderboard = teamChallenges
       .map((tc) => {
         const meta = teamMeta.get(tc.teamId);
@@ -173,7 +376,7 @@ export async function getTeamChallengeStats({
         if (a.total === null && b.total === null) return 0;
         if (a.total === null) return 1;
         if (b.total === null) return -1;
-        return isTime ? a.total - b.total : b.total - a.total;
+        return better === "lower" ? a.total - b.total : b.total - a.total;
       });
 
     const scored = leaderboard.filter((t) => t.total !== null) as Array<
@@ -185,12 +388,13 @@ export async function getTeamChallengeStats({
 
     const myRow = leaderboard.find((t) => t.teamId === selected.myTeamId) ?? null;
     const myTeamValue = myRow?.total ?? null;
-    const myTeamRank =
-      myRow?.total === null ? null : (rankByTeam.get(selected.myTeamId) ?? null);
+    const myTeamRank = myRow?.total === null ? null : (rankByTeam.get(selected.myTeamId) ?? null);
 
-    // award points only to scored teams
+    const n = scored.length;
     scored.forEach((t, idx) => {
-      pointsByTeam.set(t.teamId, (pointsByTeam.get(t.teamId) ?? 0) + (idx + 1));
+      const rank = idx + 1;
+      const points = pointsMode === "rank_low_wins" ? rank : (n - rank + 1);
+      pointsByTeam.set(t.teamId, (pointsByTeam.get(t.teamId) ?? 0) + points * weight);
     });
 
     partStats.push({
@@ -199,10 +403,13 @@ export async function getTeamChallengeStats({
       metric: part.metric,
       unit: part.unit ?? null,
       isTeamLogOnly: part.isTeamLogOnly,
+      aggregation,
+      better,
+      pointsMode,
+      weight,
       myTeamRank,
       myTeamValue,
       totalTeams: leaderboard.length,
-
       teams: leaderboard.map((t) => ({
         teamId: t.teamId,
         teamName: t.name,
@@ -211,7 +418,6 @@ export async function getTeamChallengeStats({
         value: t.total,
         isMyTeam: t.isMyTeam,
       })),
-
       chartRows: scored.slice(0, 10).map((t) => ({
         teamId: t.teamId,
         name: t.name,
@@ -222,7 +428,9 @@ export async function getTeamChallengeStats({
     });
   }
 
-  // overall = low points is better
+  const overallPointsMode: PointsMode =
+    parts.length ? ((parts[0].pointsMode ?? "rank_low_wins") as PointsMode) : "rank_low_wins";
+
   const overallLeaderboard = Array.from(pointsByTeam.entries())
     .map(([teamId, points]) => {
       const meta = teamMeta.get(teamId);
@@ -234,7 +442,9 @@ export async function getTeamChallengeStats({
         isMyTeam: teamId === selected.myTeamId,
       };
     })
-    .sort((a, b) => a.points - b.points);
+    .sort((a, b) =>
+      overallPointsMode === "rank_low_wins" ? a.points - b.points : b.points - a.points
+    );
 
   const myOverallIndex = overallLeaderboard.findIndex((t) => t.teamId === selected.myTeamId);
 
@@ -247,7 +457,7 @@ export async function getTeamChallengeStats({
       myTeamRank: myOverallIndex >= 0 ? myOverallIndex + 1 : null,
       myTeamPoints: myOverallIndex >= 0 ? overallLeaderboard[myOverallIndex].points : null,
       totalTeams: overallLeaderboard.length,
-
+      pointsMode: overallPointsMode,
       teams: overallLeaderboard.map((t, idx) => ({
         teamId: t.teamId,
         teamName: t.name,
@@ -256,7 +466,6 @@ export async function getTeamChallengeStats({
         points: t.points,
         isMyTeam: t.isMyTeam,
       })),
-
       chartRows: overallLeaderboard.slice(0, 10).map((t) => ({
         teamId: t.teamId,
         name: t.name,
