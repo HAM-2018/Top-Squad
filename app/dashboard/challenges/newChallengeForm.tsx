@@ -30,6 +30,7 @@ export default function NewChallengeForm({
         isTeamBased: data.isTeamBased,
         groupId: data.groupId,
         teamId: data.teamId,
+        pointsMode: data.pointsMode ?? "rank_low_wins",
         parts: data.parts
       });
 
