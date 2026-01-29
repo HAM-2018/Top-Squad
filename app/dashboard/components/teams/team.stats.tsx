@@ -123,12 +123,20 @@ export default function TeamChallenges({
   }
 
   const myRank = isOverall ? initialStats.overall.myTeamRank : selectedPart?.myTeamRank ?? null;
+  const cap = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
+  
+  const label = hasData
+    ? isOverall
+      ? "Overall"
+      : selectedPart
+      ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}${
+          selectedPart.unit && selectedPart.unit !== selectedPart.metric
+            ? ` • ${cap(selectedPart.unit)}`
+            : ""
+        }`
+      : "—"
+    : "No data yet";
 
-  const label = isOverall
-    ? "Overall"
-    : selectedPart
-    ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
-    : "—";
 
   const value = isOverall
     ? initialStats.overall.myTeamPoints !== null

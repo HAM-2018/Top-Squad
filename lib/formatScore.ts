@@ -5,11 +5,11 @@ export function formatScore(value: number, metric: string, unit?: string| null) 
         case "time":
             return formatTime(value);
         case "distance":
-            return unit ? `${value} ${unit}` : `${value}`;
+            return unit ? `${value}` : `${value}`;
         case "reps":
             return `${value}`;
         case "weight":
-            return unit ? `${value} ${unit}` : `${value}`;
+            return unit ? `${value}` : `${value}`;
         default:
         return `${value}`;
     }

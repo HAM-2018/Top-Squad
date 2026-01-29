@@ -81,14 +81,19 @@ export default function IndividualChallenges({
       ? initialStats!.overall.totalCompetitors
       : selectedPart?.totalCompetitors ?? 0
     : 0;
-
+  const cap = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
   const label = hasData
     ? isOverall
       ? "Overall"
       : selectedPart
-      ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}`
+      ? `${selectedPart.partName} • ${metricCapitalize(selectedPart.metric)}${
+          selectedPart.unit && selectedPart.unit !== selectedPart.metric
+            ? ` • ${cap(selectedPart.unit)}`
+            : ""
+        }`
       : "—"
     : "No data yet";
+
   // Overall points only exists for multi-part overall.
   const value = !hasData
     ? "—"
@@ -96,6 +101,7 @@ export default function IndividualChallenges({
     ? initialStats!.overall.myPoints !== null
       ? `${initialStats!.overall.myPoints} pts`
       : "—"
+
     : selectedPart?.myValue !== null && selectedPart?.myValue !== undefined
     ? formatScore(selectedPart.myValue, selectedPart.metric, selectedPart.unit)
     : "—";
