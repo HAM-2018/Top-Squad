@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { passwordGenerator } from "@/lib/passwordGenerator";
 import { useSignUp } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -67,6 +68,9 @@ export default function SignupPage() {
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const [isVerifying, setIsVerifying] = useState(false);
 
+    //Suggested Password
+    const [suggestedPassword, setSuggestedPassword] = useState("");
+
     const handleSubmit = async(values: z.infer<typeof formSchema>) => {
         if (!isLoaded) return;
 
@@ -102,6 +106,14 @@ export default function SignupPage() {
             setVerificationError("Something went wrong starting signup, please try again");
             setPendingVerification(false);
         }
+    };
+
+    const handleSuggestPassword = () => {
+        const pwd = passwordGenerator();
+        setSuggestedPassword(pwd);
+        form.setValue("password", pwd, {shouldValidate: true, shouldDirty: true});
+        form.setValue("passwordConfirm", pwd, {shouldValidate: true, shouldDirty: true});
+
     };
 
     const handleVerifyCode = async (e: React.FormEvent) => {
@@ -175,7 +187,7 @@ export default function SignupPage() {
                          <FormField control={form.control} name="lastName" render={({field}) => (
                             <FormItem>
                                 <FormLabel>
-                                    lastName
+                                    Last Name
                                 </FormLabel>
                                 <FormControl>
                                     <Input placeholder="Doe" {...field} /> 
@@ -222,6 +234,35 @@ export default function SignupPage() {
                             </FormItem>
                             )}
                          />
+                         <Card className="border border-dashed bg-muted/40 scale-95">
+                            <CardContent className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between gap-1">
+                                    <p className="text-sm font-medium">Need a password?</p>
+                                    <Button type="button" size="xs" onClick={handleSuggestPassword}>
+                                        Suggest
+                                    </Button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        className="h-8 text-xs"
+                                        value={suggestedPassword}
+                                        readOnly
+                                        placeholder="Click Suggest to generate"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="xs"
+                                        disabled={!suggestedPassword}
+                                        onClick={async () => {
+                                        await navigator.clipboard.writeText(suggestedPassword);
+                                        }}
+                                    >
+                                    Copy
+                                    </Button>
+                                </div>
+                            </CardContent>
+                         </Card>
                          <FormField control={form.control} name="password" render={({field}) => (
                             <FormItem>
                                 <FormLabel>
@@ -265,7 +306,6 @@ export default function SignupPage() {
                 </Button>
             </CardFooter>
         </Card>
-
         {pendingVerification && (
             <Card className="w-full max-w-sm mt-4">
                 <CardHeader>
