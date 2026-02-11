@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, serial, boolean, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, serial, boolean, index, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 //Team Roles
@@ -212,3 +212,26 @@ export const teamInvitesTable = pgTable(
     ),
   }
 ))
+
+export const challengeCommentsTable = pgTable(
+  "challenge_comments",
+  {
+    id: serial("id").primaryKey(),
+    teamChallengeId: integer("team_challenge_id")
+      .notNull()
+      .references(() => teamChallengesTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    imageUrl: text("image_url"),
+    imagePublicId: text("image_public_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byTeamChallengeCreatedAt: index("idx_challenge_comments_team_challenge_created_at").on(
+      t.teamChallengeId,
+      t.createdAt
+    ),
+  })
+);

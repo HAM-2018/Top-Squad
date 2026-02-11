@@ -7,6 +7,7 @@ import { getSoloChallengeProgressDaily } from "@/db/queries/getSoloChallengeProg
 import { getTeamChallengeStats } from "@/db/queries/getTeamChallengeStats";
 import { getTeamChallengeProgressDaily } from "@/db/queries/getTeamChallengeProgressDaily";
 import { getCurrentUser } from "@/db/queries/getCurrentUser";
+import { GetChallengeComments } from "@/db/queries/getChallengeComments";
 
 type SearchParams = {
   solo?: string | string[];
@@ -25,16 +26,16 @@ function toPositiveInt(v?: string | null) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function pickCurrentOptionForTeam<T extends { teamChallengeId: number; teamId: number }>(
-  options: T[],
-  teamId: number | null,
-  idFromUrl: number | null
-) {
-  const optionsForTeam = teamId ? options.filter((o) => o.teamId === teamId) : [];
+function pickCurrentOptionForTeam<
+  T extends { teamChallengeId: number; teamId: number },
+>(options: T[], teamId: number | null, idFromUrl: number | null) {
+  const optionsForTeam = teamId
+    ? options.filter((o) => o.teamId === teamId)
+    : [];
 
   const fromUrl =
     idFromUrl !== null
-      ? optionsForTeam.find((o) => o.teamChallengeId === idFromUrl) ?? null
+      ? (optionsForTeam.find((o) => o.teamChallengeId === idFromUrl) ?? null)
       : null;
 
   const latestForTeam = optionsForTeam[0] ?? null;
@@ -46,43 +47,41 @@ export default async function DashboardPage({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
-
   const user = await getCurrentUser();
-
   const sp = (await searchParams) ?? {};
 
   const soloIdFromUrl = toPositiveInt(firstParam(sp.solo));
   const teamIdFromUrl = toPositiveInt(firstParam(sp.team));
   const teamChallengeIdFromUrl = toPositiveInt(firstParam(sp.teamChallenge));
 
-  // find active tab from URL 
   const tab = firstParam(sp.tab);
   const activeTab: "solo" | "team" = tab === "team" ? "team" : "solo";
 
-  // get teams and solo challenges
   const [teams, soloOptions, teamOptions] = await Promise.all([
     getTeams(),
     getSoloChallengeOptions(user.id),
-    activeTab === "team" ? getTeamChallengeOptions(user.id) : Promise.resolve([]),
+    activeTab === "team"
+      ? getTeamChallengeOptions(user.id)
+      : Promise.resolve([]),
   ]);
 
-  // pick base team
   const latestSoloOverall = soloOptions[0] ?? null;
   const selectedTeamId =
     teamIdFromUrl ?? latestSoloOverall?.teamId ?? teams[0]?.id ?? null;
 
-  // SOLO selection 
   const { current: currentSolo } = pickCurrentOptionForTeam(
     soloOptions as any[],
     selectedTeamId,
-    soloIdFromUrl
+    soloIdFromUrl,
   );
   const selectedSoloTeamChallengeId = currentSolo?.teamChallengeId ?? null;
 
-  // SOLO stats/progress 
   const [soloStats, soloProgress] = await Promise.all([
     selectedSoloTeamChallengeId
-      ? getSoloChallengeStats({ teamChallengeId: selectedSoloTeamChallengeId, userId: user.id })
+      ? getSoloChallengeStats({
+          teamChallengeId: selectedSoloTeamChallengeId,
+          userId: user.id,
+        })
       : Promise.resolve(null),
 
     selectedSoloTeamChallengeId
@@ -90,7 +89,6 @@ export default async function DashboardPage({
       : Promise.resolve(null),
   ]);
 
-  // get team stats when tab is set to team
   let selectedTeamTeamChallengeId: number | null = null;
   let teamStats: any = null;
   let teamProgress: any = null;
@@ -99,14 +97,17 @@ export default async function DashboardPage({
     const { current: currentTeamChallenge } = pickCurrentOptionForTeam(
       teamOptions as any[],
       selectedTeamId,
-      teamChallengeIdFromUrl
+      teamChallengeIdFromUrl,
     );
 
     selectedTeamTeamChallengeId = currentTeamChallenge?.teamChallengeId ?? null;
 
     [teamStats, teamProgress] = await Promise.all([
       selectedTeamTeamChallengeId
-        ? getTeamChallengeStats({ userId: user.id, teamChallengeId: selectedTeamTeamChallengeId })
+        ? getTeamChallengeStats({
+            userId: user.id,
+            teamChallengeId: selectedTeamTeamChallengeId,
+          })
         : Promise.resolve(null),
 
       selectedTeamTeamChallengeId
@@ -115,9 +116,18 @@ export default async function DashboardPage({
     ]);
   }
 
+  const selectedCommentTeamChallengeId =
+    activeTab === "team"
+      ? selectedTeamTeamChallengeId
+      : selectedSoloTeamChallengeId;
+
+  const initialComments = selectedCommentTeamChallengeId
+    ? await GetChallengeComments(selectedCommentTeamChallengeId)
+    : [];
+
   return (
     <Dashboard
-      activeTab={activeTab} 
+      activeTab={activeTab}
       teams={teams}
       selectedTeamId={selectedTeamId}
       soloOptions={soloOptions}
@@ -128,6 +138,8 @@ export default async function DashboardPage({
       teamProgress={teamProgress}
       teamOptions={teamOptions as any[]}
       selectedTeamChallengeId={selectedTeamTeamChallengeId}
+      selectedCommentTeamChallengeId={selectedCommentTeamChallengeId}
+      initialComments={initialComments}
     />
   );
 }

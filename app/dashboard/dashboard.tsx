@@ -24,6 +24,8 @@ import { SoloProgress, TeamProgress } from "@/types/lineGraphStats";
 import TeamChallengesSkeleton from "./components/teams/team.stats.skeleton";
 import IndividualChallengesSkeleton from "./components/personal/personal.stats.skeleton";
 import DemoDisclaimer from "./components/demo-disclaimer";
+import ChallengeComments from "./components/challenge-comments";
+import type { ChallengeComment } from "@/types/challengeComments";
 
 export default function Dashboard({
   activeTab = "solo",
@@ -37,8 +39,10 @@ export default function Dashboard({
   selectedTeamChallengeId,
   teamStats,
   teamProgress,
+  selectedCommentTeamChallengeId,
+  initialComments,
 }: {
-  activeTab?: "solo" | "team"
+  activeTab?: "solo" | "team";
   soloStats: MultiPartChallengeStats | null;
   soloProgress: SoloProgress | null;
   soloOptions: SoloChallengeOption[];
@@ -49,9 +53,9 @@ export default function Dashboard({
   selectedTeamChallengeId: number | null;
   teamStats: TeamChallengeStats | null;
   teamProgress: TeamProgress | null;
+  selectedCommentTeamChallengeId: number | null;
+  initialComments: ChallengeComment[];
 }) {
-
-
   type Tab = "individual challenges" | "team challenges";
   const tabToUrl = (t: Tab) => (t === "team challenges" ? "team" : "solo");
 
@@ -62,7 +66,7 @@ export default function Dashboard({
   const sp = useSearchParams();
 
   const [tab, setTab] = useState<Tab>(() =>
-    activeTab === "team" ? "team challenges" : "individual challenges"
+    activeTab === "team" ? "team challenges" : "individual challenges",
   );
 
   const [image, setImage] = useState(true);
@@ -72,14 +76,12 @@ export default function Dashboard({
 
   const avatarSrc = selectedTeam?.avatarUrl ?? null;
 
-  // if the avatar URL changes
   const [lastSrc, setLastSrc] = useState<string | null>(avatarSrc);
-    if (lastSrc !== avatarSrc) {
-      setLastSrc(avatarSrc);
-      if (!image) setImage(true);
-    }
+  if (lastSrc !== avatarSrc) {
+    setLastSrc(avatarSrc);
+    if (!image) setImage(true);
+  }
 
-  // SOLO options
   const soloOptionsForTeam = useMemo(() => {
     if (!selectedTeamId) return [];
     return soloOptions.filter((o) => o.teamId === selectedTeamId);
@@ -87,12 +89,11 @@ export default function Dashboard({
 
   const soloLabel = useMemo(() => {
     const opt = soloOptionsForTeam.find(
-      (o) => o.teamChallengeId === selectedSoloTeamChallengeId
+      (o) => o.teamChallengeId === selectedSoloTeamChallengeId,
     );
     return opt?.challengeName ?? null;
   }, [soloOptionsForTeam, selectedSoloTeamChallengeId]);
 
-  // Team options
   const teamOptionsForTeam = useMemo(() => {
     if (!selectedTeamId) return [];
     return teamOptions.filter((o) => o.teamId === selectedTeamId);
@@ -100,12 +101,11 @@ export default function Dashboard({
 
   const teamLabel = useMemo(() => {
     const opt = teamOptionsForTeam.find(
-      (o) => o.teamChallengeId === selectedTeamChallengeId
+      (o) => o.teamChallengeId === selectedTeamChallengeId,
     );
     return opt?.challengeName ?? null;
   }, [teamOptionsForTeam, selectedTeamChallengeId]);
 
-  // URL helpers
   const pushParams = (next: {
     team?: number | null;
     solo?: number | null;
@@ -115,28 +115,29 @@ export default function Dashboard({
     const params = new URLSearchParams(sp.toString());
 
     if (next.team === null) params.delete("team");
-    else if (typeof next.team === "number") params.set("team", String(next.team));
+    else if (typeof next.team === "number")
+      params.set("team", String(next.team));
 
     if (next.solo === null) params.delete("solo");
-    else if (typeof next.solo === "number") params.set("solo", String(next.solo));
+    else if (typeof next.solo === "number")
+      params.set("solo", String(next.solo));
 
     if (next.teamChallenge === null) params.delete("teamChallenge");
-    else if (typeof next.teamChallenge === "number")
+    else if (typeof next.teamChallenge === "number") {
       params.set("teamChallenge", String(next.teamChallenge));
+    }
 
     if (next.tab === null) params.delete("tab");
     else if (next.tab) params.set("tab", next.tab);
 
     startTransition(() => {
-    router.push(`/dashboard?${params.toString()}`);
-    })
+      router.push(`/dashboard?${params.toString()}`);
+    });
   };
 
   const onTeamChange = (teamId: number) => {
-    // when team changes, pick the newest solo + newest team-challenge for that team
     const firstSoloForTeam =
       soloOptions.find((o) => o.teamId === teamId)?.teamChallengeId ?? null;
-
     const firstTeamChallengeForTeam =
       teamOptions.find((o) => o.teamId === teamId)?.teamChallengeId ?? null;
 
@@ -144,7 +145,7 @@ export default function Dashboard({
       team: teamId,
       solo: firstSoloForTeam,
       teamChallenge: firstTeamChallengeForTeam,
-      tab: tabToUrl(tab)
+      tab: tabToUrl(tab),
     });
   };
 
@@ -168,6 +169,16 @@ export default function Dashboard({
   const showSoloHeader = tab === "individual challenges";
   const showTeamHeader = tab === "team challenges";
 
+  const currentCommentTargetId =
+    tab === "team challenges"
+      ? selectedTeamChallengeId
+      : selectedSoloTeamChallengeId;
+
+  const commentsForCurrentTarget =
+    selectedCommentTeamChallengeId === currentCommentTargetId
+      ? initialComments
+      : [];
+
   return (
     <div className="space-y-4">
       <DemoDisclaimer />
@@ -183,7 +194,6 @@ export default function Dashboard({
           "
         >
           <div>
-            {/* Team */}
             <div className="mb-3">
               <div className="mb-1 text-center text-[10px] font-semibold tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">
                 Team:
@@ -208,6 +218,7 @@ export default function Dashboard({
                 </SelectContent>
               </Select>
             </div>
+
             {showSoloHeader ? (
               <div>
                 <div className="mb-1 text-center text-[10px] font-semibold tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">
@@ -244,13 +255,18 @@ export default function Dashboard({
                 </Select>
               </div>
             ) : null}
+
             {showTeamHeader ? (
               <div>
                 <div className="mb-2 text-center text-xs font-semibold tracking-wide text-muted-foreground">
                   Challenge:
                 </div>
                 <Select
-                  value={selectedTeamChallengeId ? String(selectedTeamChallengeId) : ""}
+                  value={
+                    selectedTeamChallengeId
+                      ? String(selectedTeamChallengeId)
+                      : ""
+                  }
                   onValueChange={(v) => {
                     const n = Number(v);
                     if (Number.isFinite(n)) onTeamChallengeChange(n);
@@ -276,9 +292,9 @@ export default function Dashboard({
               </div>
             ) : null}
           </div>
-          {/* spacer column */}
+
           <div />
-          {/* Avatar */}
+
           <div className="flex justify-center md:mr-40">
             <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-35 md:w-35 border bg-background">
               {selectedTeam?.avatarUrl && image ? (
@@ -298,6 +314,7 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
       <Tabs
         value={tab}
         onValueChange={(v) => {
@@ -307,7 +324,9 @@ export default function Dashboard({
         }}
       >
         <TabsList className="mb-4">
-          <TabsTrigger value="individual challenges">Solo challenges</TabsTrigger>
+          <TabsTrigger value="individual challenges">
+            Solo challenges
+          </TabsTrigger>
           <TabsTrigger value="team challenges">Team challenges</TabsTrigger>
         </TabsList>
 
@@ -315,7 +334,10 @@ export default function Dashboard({
           {isPending ? (
             <IndividualChallengesSkeleton />
           ) : (
-            <IndividualChallenges initialStats={soloStats} soloProgress={soloProgress} />
+            <IndividualChallenges
+              initialStats={soloStats}
+              soloProgress={soloProgress}
+            />
           )}
         </TabsContent>
 
@@ -323,10 +345,19 @@ export default function Dashboard({
           {isPending ? (
             <TeamChallengesSkeleton />
           ) : (
-            <TeamChallenges initialStats={teamStats} teamProgress={teamProgress ?? null} />
+            <TeamChallenges
+              initialStats={teamStats}
+              teamProgress={teamProgress ?? null}
+            />
           )}
         </TabsContent>
-        </Tabs>
+      </Tabs>
+
+      <ChallengeComments
+        key={currentCommentTargetId ?? -1}
+        teamChallengeId={currentCommentTargetId}
+        initialComments={commentsForCurrentTarget}
+      />
     </div>
   );
 }
