@@ -26,6 +26,7 @@ import IndividualChallengesSkeleton from "./components/personal/personal.stats.s
 import DemoDisclaimer from "./components/demo-disclaimer";
 import ChallengeComments from "./components/challenge-comments";
 import type { ChallengeComment } from "@/types/challengeComments";
+import { Sparkles } from "lucide-react";
 
 export default function Dashboard({
   activeTab = "solo",
@@ -105,6 +106,12 @@ export default function Dashboard({
     );
     return opt?.challengeName ?? null;
   }, [teamOptionsForTeam, selectedTeamChallengeId]);
+
+  const activeChallengeName =
+    tab === "individual challenges" ? soloLabel : teamLabel;
+
+  const activeChallengeTone =
+    tab === "individual challenges" ? "Solo mode" : "Squad mode";
 
   const pushParams = (next: {
     team?: number | null;
@@ -329,6 +336,25 @@ export default function Dashboard({
           </TabsTrigger>
           <TabsTrigger value="team challenges">Team challenges</TabsTrigger>
         </TabsList>
+
+        <div className="text-center text-xl mb-4 rounded-xl border bg-linear-to-r from-green-600 via-green-400 to-green-200 px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-black">
+            <Sparkles className="h-4 w-4" />
+            {activeChallengeTone}
+          </div>
+          <p className="mt-1 text-xl font-semibold xl:text-base text-white">
+            {activeChallengeName ? (
+              <>
+                Current challenge:{" "}
+                <span className="font-semibold text-gray-900">
+                  {activeChallengeName}
+                </span>
+              </>
+            ) : (
+              "Pick a challenge to get started."
+            )}
+          </p>
+        </div>
 
         <TabsContent value="individual challenges">
           {isPending ? (
