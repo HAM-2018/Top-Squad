@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: topsquad
-          image: hadensmith/topsquad:1d0aea81b31da6f66ddb6b7830be650ab7add34f
+          image: hadensmith/topsquad:f6ef145acd3ce6ab7d407040d2e4eb872020ab4c
           imagePullPolicy: Always
           ports:
             - name: http
