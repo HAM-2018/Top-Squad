@@ -4,6 +4,7 @@ metadata:
   name: topsquad-ingress
   namespace: topsquad
   annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
   ingressClassName: nginx
   tls:
