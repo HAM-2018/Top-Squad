@@ -127,14 +127,17 @@ export default function ChallengeComments({
                       disabled={isPending}
                       onClick={() => {
                         setImageFile(null);
-                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        if (fileInputRef.current)
+                          fileInputRef.current.value = "";
                       }}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </>
                 ) : (
-                  <span className="text-sm text-muted-foreground">No file chosen</span>
+                  <span className="text-sm text-muted-foreground">
+                    No file chosen
+                  </span>
                 )}
               </div>
 

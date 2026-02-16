@@ -121,7 +121,9 @@ export default function CreateTeamCard({ onCreate }: Props) {
             <div className="flex items-center justify-end gap-2">
               <Button
                 onClick={clearForm}
-                disabled={isPending || (!teamName && !teamDescription && !avatarFile)}
+                disabled={
+                  isPending || (!teamName && !teamDescription && !avatarFile)
+                }
               >
                 Clear
               </Button>
@@ -156,7 +158,10 @@ export default function CreateTeamCard({ onCreate }: Props) {
             <div className="flex items-center gap-3">
               <Avatar className="h-24 w-24 border bg-background shrink-0">
                 {avatarPreviewUrl ? (
-                  <AvatarImage src={avatarPreviewUrl} alt={teamName || "Team"} />
+                  <AvatarImage
+                    src={avatarPreviewUrl}
+                    alt={teamName || "Team"}
+                  />
                 ) : (
                   <AvatarFallback className="text-lg font-semibold">
                     {initialsFromName(teamName || "Team")}
@@ -223,7 +228,9 @@ export default function CreateTeamCard({ onCreate }: Props) {
             setRawImageUrl(null);
           }}
           onSave={(blob) => {
-            const file = new File([blob], "team-avatar.png", { type: "image/png" });
+            const file = new File([blob], "team-avatar.png", {
+              type: "image/png",
+            });
             setAvatarFile(file);
 
             setCropOpen(false);
