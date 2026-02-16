@@ -210,6 +210,7 @@ export default function ChallengeComments({
                           src={comment.imageUrl}
                           alt="Post image"
                           fill
+                          unoptimized
                           className="object-contain"
                         />
                       </div>
