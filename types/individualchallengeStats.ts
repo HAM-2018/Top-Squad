@@ -30,7 +30,6 @@ export type OverallStats = {
   pointsMode: "rank_low_wins" | "rank_high_wins";
 };
 
-
 export type MultiPartChallengeStats = {
   challengeId: number;
   parts: PartStats[];
@@ -48,6 +47,7 @@ export type ChallengeParts = {
 };
 
 export type ChallengeWithParts = {
+  teamChallengeId: number;
   challengeId: number;
   name: string;
   description: string;
@@ -56,5 +56,7 @@ export type ChallengeWithParts = {
   groupName: string;
   startDate: Date | null;
   endDate: Date | null;
+  challengeIsActive: boolean;
+  teamChallengeIsActive: boolean;
   parts: ChallengeParts[];
-}
+};

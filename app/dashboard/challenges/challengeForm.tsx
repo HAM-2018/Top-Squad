@@ -3,7 +3,11 @@ import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
   FormControl,
@@ -23,7 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, PlusIcon, Trash2Icon, TrophyIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -33,7 +37,14 @@ import {
 import z from "zod";
 import { challengeMetricValues } from "@/db/schema";
 import { ChallengeWithParts } from "@/types/individualchallengeStats";
-import { aggregationValues, betterValues, pointsModeValues } from "@/types/scoring";
+import {
+  aggregationValues,
+  betterValues,
+  pointsModeValues,
+} from "@/types/scoring";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ChallengeStatus, getChallengeStatus } from "@/lib/challengeForm";
+import { ChallengeList } from "../components/ChallengeList";
 
 type Teams = {
   id: number;
@@ -82,12 +93,41 @@ export default function ChallengeForm({
     },
   });
 
-  const { fields: partFields, append, remove } = useFieldArray({
+  const {
+    fields: partFields,
+    append,
+    remove,
+  } = useFieldArray({
     control: form.control,
     name: "parts",
   });
 
   const isTeamBased = form.watch("isTeamBased");
+  const [challengeTab, setChallengeTab] = useState<ChallengeStatus>("live");
+
+  const liveChallenges = useMemo(
+    () =>
+      challenges.filter(
+        (challenge) => getChallengeStatus(challenge) === "live",
+      ),
+    [challenges],
+  );
+
+  const upcomingChallenges = useMemo(
+    () =>
+      challenges.filter(
+        (challenge) => getChallengeStatus(challenge) === "upcoming",
+      ),
+    [challenges],
+  );
+
+  const completedChallenges = useMemo(
+    () =>
+      challenges.filter(
+        (challenge) => getChallengeStatus(challenge) === "completed",
+      ),
+    [challenges],
+  );
 
   useEffect(() => {
     if (!isTeamBased) {
@@ -174,7 +214,10 @@ export default function ChallengeForm({
                           </SelectTrigger>
                           <SelectContent>
                             {teams.map((team) => (
-                              <SelectItem key={team.id} value={team.id.toString()}>
+                              <SelectItem
+                                key={team.id}
+                                value={team.id.toString()}
+                              >
                                 {team.name}
                               </SelectItem>
                             ))}
@@ -216,11 +259,15 @@ export default function ChallengeForm({
                               variant="outline"
                               className={cn(
                                 "justify-start text-left font-normal w-full",
-                                !field.value && "text-muted-foreground"
+                                !field.value && "text-muted-foreground",
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -250,11 +297,15 @@ export default function ChallengeForm({
                               variant="outline"
                               className={cn(
                                 "justify-start text-left font-normal w-full",
-                                !field.value && "text-muted-foreground"
+                                !field.value && "text-muted-foreground",
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -279,11 +330,15 @@ export default function ChallengeForm({
                       <div className="space-y-0.5">
                         <FormLabel>Team-based challenge</FormLabel>
                         <p className="text-xs text-muted-foreground">
-                          If enabled, this challenge will be tracked at the team level.
+                          If enabled, this challenge will be tracked at the team
+                          level.
                         </p>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -299,7 +354,9 @@ export default function ChallengeForm({
                         <FormLabel>Select Team</FormLabel>
                         <FormControl>
                           <Select
-                            onValueChange={(val) => field.onChange(parseInt(val))}
+                            onValueChange={(val) =>
+                              field.onChange(parseInt(val))
+                            }
                             value={field.value ? field.value.toString() : ""}
                           >
                             <SelectTrigger className="w-full">
@@ -307,7 +364,10 @@ export default function ChallengeForm({
                             </SelectTrigger>
                             <SelectContent>
                               {teams.map((team) => (
-                                <SelectItem key={team.id} value={team.id.toString()}>
+                                <SelectItem
+                                  key={team.id}
+                                  value={team.id.toString()}
+                                >
                                   {team.name}
                                 </SelectItem>
                               ))}
@@ -349,7 +409,10 @@ export default function ChallengeForm({
 
                   <div className="space-y-3">
                     {partFields.map((pf, index) => (
-                      <div key={pf.id} className="space-y-2 rounded-md border p-3">
+                      <div
+                        key={pf.id}
+                        className="space-y-2 rounded-md border p-3"
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                           <FormField
                             control={form.control}
@@ -376,14 +439,18 @@ export default function ChallengeForm({
                               <FormItem className="md:col-span-2">
                                 <FormLabel>Metric</FormLabel>
                                 <FormControl>
-                                  <Select value={field.value} onValueChange={field.onChange}>
+                                  <Select
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                  >
                                     <SelectTrigger className="h-10 w-full">
                                       <SelectValue placeholder="Select metric" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {challengeMetricValues.map((metric) => (
                                         <SelectItem key={metric} value={metric}>
-                                          {metric.charAt(0).toUpperCase() + metric.slice(1)}
+                                          {metric.charAt(0).toUpperCase() +
+                                            metric.slice(1)}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -410,7 +477,7 @@ export default function ChallengeForm({
                                       field.onChange(
                                         e.target.value === ""
                                           ? undefined
-                                          : Number(e.target.value)
+                                          : Number(e.target.value),
                                       )
                                     }
                                   />
@@ -457,9 +524,14 @@ export default function ChallengeForm({
                             name={`parts.${index}.aggregation` as const}
                             render={({ field }) => (
                               <FormItem className="md:col-span-3">
-                                <FormLabel>How will this event be scored?</FormLabel>
+                                <FormLabel>
+                                  How will this event be scored?
+                                </FormLabel>
                                 <FormControl>
-                                  <Select value={field.value} onValueChange={field.onChange}>
+                                  <Select
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                  >
                                     <SelectTrigger className="h-10 w-full">
                                       <SelectValue placeholder="Select" />
                                     </SelectTrigger>
@@ -484,14 +556,19 @@ export default function ChallengeForm({
                               <FormItem className="md:col-span-3">
                                 <FormLabel>How do you win?</FormLabel>
                                 <FormControl>
-                                  <Select value={field.value} onValueChange={field.onChange}>
+                                  <Select
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                  >
                                     <SelectTrigger className="h-10 w-full">
                                       <SelectValue placeholder="Select" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {betterValues.map((v) => (
                                         <SelectItem key={v} value={v}>
-                                          {v === "higher" ? "Higher is better" : "Lower is better"}
+                                          {v === "higher"
+                                            ? "Higher is better"
+                                            : "Lower is better"}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -515,7 +592,11 @@ export default function ChallengeForm({
                                     min={1}
                                     value={field.value ?? 1}
                                     onChange={(e) =>
-                                      field.onChange(e.target.value === "" ? 1 : Number(e.target.value))
+                                      field.onChange(
+                                        e.target.value === ""
+                                          ? 1
+                                          : Number(e.target.value),
+                                      )
                                     }
                                   />
                                 </FormControl>
@@ -528,14 +609,19 @@ export default function ChallengeForm({
                         <div
                           className={cn(
                             "overflow-hidden transition-all duration-200 ease-in-out",
-                            isTeamBased ? "max-h-24 opacity-100" : "max-h-0 opacity-0"
+                            isTeamBased
+                              ? "max-h-24 opacity-100"
+                              : "max-h-0 opacity-0",
                           )}
                         >
                           <div className="rounded-md border p-3 flex items-center justify-between mt-2">
                             <div className="space-y-0.5">
-                              <p className="text-sm font-medium">Event completed as a Team?</p>
+                              <p className="text-sm font-medium">
+                                Event completed as a Team?
+                              </p>
                               <p className="text-xs text-muted-foreground">
-                                If enabled, only admins/owners can record a single official team score for this event.
+                                If enabled, only admins/owners can record a
+                                single official team score for this event.
                               </p>
                             </div>
 
@@ -569,14 +655,19 @@ export default function ChallengeForm({
                           <FormItem>
                             <FormLabel>Overall points mode</FormLabel>
                             <FormControl>
-                              <Select value={field.value} onValueChange={field.onChange}>
+                              <Select
+                                value={field.value}
+                                onValueChange={field.onChange}
+                              >
                                 <SelectTrigger className="h-10 w-full">
                                   <SelectValue placeholder="Select points mode" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {pointsModeValues.map((v) => (
                                     <SelectItem key={v} value={v}>
-                                      {v === "rank_low_wins" ? "Low points wins" : "High points wins"}
+                                      {v === "rank_low_wins"
+                                        ? "Low points wins"
+                                        : "High points wins"}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -607,60 +698,72 @@ export default function ChallengeForm({
             Your Challenges
             {challenges.length > 0 ? (
               <span className="text-xs text-muted-foreground">
-                Showing {Math.min(challenges.length, 8)}
+                {challengeTab === "live" &&
+                  `Showing ${Math.min(liveChallenges.length, 8)} of ${liveChallenges.length}`}
+                {challengeTab === "upcoming" &&
+                  `Showing ${Math.min(upcomingChallenges.length, 8)} of ${upcomingChallenges.length}`}
+                {challengeTab === "completed" &&
+                  `Showing ${Math.min(completedChallenges.length, 8)} of ${completedChallenges.length}`}
               </span>
             ) : null}
           </CardTitle>
         </CardHeader>
+
         <CardContent className="pt-4">
           {challenges.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              You do not have any active challenges yet. Create one above to get started.
+              You do not have any challenges yet. Create one above to get
+              started.
             </p>
           ) : (
-            <div className="space-y-3">
-              {challenges.slice(0, 8).map((c) => (
-                <div key={c.challengeId} className="rounded-md border p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-medium truncate">{c.name}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full border text-muted-foreground shrink-0">
-                          {c.isTeamBased ? "Team" : "Solo"}
-                        </span>
-                        {c.groupName ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full border text-muted-foreground shrink-0">
-                            {c.groupName}
-                          </span>
-                        ) : null}
-                      </div>
+            <Tabs
+              value={challengeTab}
+              onValueChange={(value) =>
+                setChallengeTab(value as ChallengeStatus)
+              }
+            >
+              <TabsList className="mb-4 grid w-full grid-cols-3">
+                <TabsTrigger value="live">
+                  Live ({liveChallenges.length})
+                </TabsTrigger>
+                <TabsTrigger value="upcoming">
+                  Upcoming ({upcomingChallenges.length})
+                </TabsTrigger>
+                <TabsTrigger value="completed">
+                  Completed ({completedChallenges.length})
+                </TabsTrigger>
+              </TabsList>
 
-                      <div className="text-xs text-muted-foreground mt-1 truncate">
-                        {c.description}
-                      </div>
+              <TabsContent value="live" className="mt-0">
+                {liveChallenges.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No live challenges right now
+                  </p>
+                ) : (
+                  <ChallengeList challenges={liveChallenges} />
+                )}
+              </TabsContent>
 
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {c.parts.slice(0, 4).map((p) => (
-                          <span
-                            key={`${c.challengeId}-${p.partId}`}
-                            className="text-[10px] px-2 py-1 rounded-full border text-muted-foreground"
-                          >
-                            {p.partName} • {p.metric}
-                            {p.unit ? ` ${p.unit}` : ""}
-                            {p.isTeamLogOnly ? " • admin" : ""}
-                          </span>
-                        ))}
-                        {c.parts.length > 4 ? (
-                          <span className="text-[10px] px-2 py-1 rounded-full border text-muted-foreground">
-                            +{c.parts.length - 4} more
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <TabsContent value="upcoming" className="mt-0">
+                {upcomingChallenges.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No upcoming challenges
+                  </p>
+                ) : (
+                  <ChallengeList challenges={upcomingChallenges} />
+                )}
+              </TabsContent>
+
+              <TabsContent value="completed" className="mt-0">
+                {completedChallenges.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    You have not completed any challenges yet
+                  </p>
+                ) : (
+                  <ChallengeList challenges={completedChallenges} />
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>

@@ -10,86 +10,95 @@ import {
 import type { ChallengeWithParts } from "@/types/individualchallengeStats";
 
 export async function getChallengesWithPartsForUser(
-  userDbId: number
+  userDbId: number,
 ): Promise<ChallengeWithParts[]> {
   const rows = await db
-  .select({
-    challengeId: challengeTable.id,
-    challengeName: challengeTable.name,
-    challengeDescription: challengeTable.description,
-    isTeamBased: challengeTable.isTeamBased,
-    groupId: challengeTable.groupId,
-    groupName: teamsTable.name,
-    startDate: challengeTable.startDate,
-    endDate: challengeTable.endDate,
+    .select({
+      teamChallengeId: teamChallengesTable.id,
+      challengeId: challengeTable.id,
+      challengeName: challengeTable.name,
+      challengeDescription: challengeTable.description,
+      isTeamBased: challengeTable.isTeamBased,
+      groupId: challengeTable.groupId,
+      groupName: teamsTable.name,
+      startDate: challengeTable.startDate,
+      endDate: challengeTable.endDate,
+      challengeIsActive: challengeTable.isActive,
+      teamChallengeIsActive: teamChallengesTable.isActive,
 
-    partId: challengePartsTable.id,
-    partName: challengePartsTable.name,
-    metric: challengePartsTable.metric,
-    unit: challengePartsTable.unit,
-    targetValue: challengePartsTable.targetValue,
-    sortOrder: challengePartsTable.sortOrder,
-    isTeamLogOnly: challengePartsTable.isTeamLogOnly,
-  })
-  .from(teamChallengesTable)
-  .innerJoin(challengeTable, eq(challengeTable.id, teamChallengesTable.challengeId))
-  .innerJoin(teamsTable, eq(teamsTable.id, challengeTable.groupId))
-  .innerJoin(
-    teamMembersTable,
-    and(
-      eq(teamMembersTable.teamId, teamChallengesTable.teamId),
-      eq(teamMembersTable.userId, userDbId)
+      partId: challengePartsTable.id,
+      partName: challengePartsTable.name,
+      metric: challengePartsTable.metric,
+      unit: challengePartsTable.unit,
+      targetValue: challengePartsTable.targetValue,
+      sortOrder: challengePartsTable.sortOrder,
+      isTeamLogOnly: challengePartsTable.isTeamLogOnly,
+    })
+    .from(teamChallengesTable)
+    .innerJoin(
+      challengeTable,
+      eq(challengeTable.id, teamChallengesTable.challengeId),
     )
-  )
-  .leftJoin(challengePartsTable, eq(challengePartsTable.challengeId, challengeTable.id))
-  .where(
-    and(
-      eq(challengeTable.isActive, true),
-      eq(teamChallengesTable.isActive, true)
+    .innerJoin(teamsTable, eq(teamsTable.id, challengeTable.groupId))
+    .innerJoin(
+      teamMembersTable,
+      and(
+        eq(teamMembersTable.teamId, teamChallengesTable.teamId),
+        eq(teamMembersTable.userId, userDbId),
+      ),
     )
-  )
-  .orderBy(desc(challengeTable.createdAt), asc(challengePartsTable.sortOrder));
+    .leftJoin(
+      challengePartsTable,
+      eq(challengePartsTable.challengeId, challengeTable.id),
+    )
+    .orderBy(
+      desc(challengeTable.createdAt),
+      asc(challengePartsTable.sortOrder),
+    );
 
   // Group into ChallengeWithParts[]
-const byChallenge = new Map<number, ChallengeWithParts>();
-const partsSeen = new Map<number, Set<number>>(); // challengeId -> set(partId)
+  const byTeamChallenge = new Map<number, ChallengeWithParts>();
+  const partsSeen = new Map<number, Set<number>>(); // teamChallengeId -> set(partId)
 
-for (const r of rows) {
-  let c = byChallenge.get(r.challengeId);
+  for (const r of rows) {
+    let c = byTeamChallenge.get(r.teamChallengeId);
 
-  if (!c) {
-    c = {
-      challengeId: r.challengeId,
-      name: r.challengeName,
-      description: r.challengeDescription,
-      isTeamBased: r.isTeamBased,
-      groupId: r.groupId,
-      groupName: r.groupName,
-      startDate: r.startDate ?? null,
-      endDate: r.endDate ?? null,
-      parts: [],
-    };
-    byChallenge.set(r.challengeId, c);
-    partsSeen.set(r.challengeId, new Set());
-  }
+    if (!c) {
+      c = {
+        teamChallengeId: r.teamChallengeId,
+        challengeId: r.challengeId,
+        name: r.challengeName,
+        description: r.challengeDescription,
+        isTeamBased: r.isTeamBased,
+        groupId: r.groupId,
+        groupName: r.groupName,
+        startDate: r.startDate ?? null,
+        endDate: r.endDate ?? null,
+        challengeIsActive: r.challengeIsActive ?? true,
+        teamChallengeIsActive: r.teamChallengeIsActive ?? true,
+        parts: [],
+      };
+      byTeamChallenge.set(r.teamChallengeId, c);
+      partsSeen.set(r.teamChallengeId, new Set());
+    }
 
-  if (r.partId) {
-    const seen = partsSeen.get(r.challengeId)!;
-    if (!seen.has(r.partId)) {
-      seen.add(r.partId);
+    if (r.partId) {
+      const seen = partsSeen.get(r.teamChallengeId)!;
+      if (!seen.has(r.partId)) {
+        seen.add(r.partId);
 
-      c.parts.push({
-        partId: r.partId,
-        partName: r.partName ?? "Unnamed Event",
-        metric: r.metric as any,
-        unit: r.unit ?? null,
-        targetValue: r.targetValue ?? null,
-        sortOrder: r.sortOrder ?? 1,
-        isTeamLogOnly: r.isTeamLogOnly ?? false,
-      });
+        c.parts.push({
+          partId: r.partId,
+          partName: r.partName ?? "Unnamed Event",
+          metric: r.metric as any,
+          unit: r.unit ?? null,
+          targetValue: r.targetValue ?? null,
+          sortOrder: r.sortOrder ?? 1,
+          isTeamLogOnly: r.isTeamLogOnly ?? false,
+        });
+      }
     }
   }
-}
 
-return Array.from(byChallenge.values());
+  return Array.from(byTeamChallenge.values());
 }
