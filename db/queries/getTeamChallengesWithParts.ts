@@ -12,6 +12,7 @@ import type { ChallengeWithParts } from "@/types/individualchallengeStats";
 export async function getTeamChallengesForUser(userDbId: number): Promise<ChallengeWithParts[]> {
   const rows = await db
     .select({
+      teamChallengeId: teamChallengesTable.id,
       challengeId: challengeTable.id,
       challengeName: challengeTable.name,
       challengeDescription: challengeTable.description,
@@ -20,6 +21,8 @@ export async function getTeamChallengesForUser(userDbId: number): Promise<Challe
       groupName: teamsTable.name,
       startDate: challengeTable.startDate,
       endDate: challengeTable.endDate,
+      challengeIsActive: challengeTable.isActive,
+      teamChallengeIsActive: teamChallengesTable.isActive,
 
       partId: challengePartsTable.id,
       partName: challengePartsTable.name,
@@ -45,13 +48,15 @@ export async function getTeamChallengesForUser(userDbId: number): Promise<Challe
     .orderBy(desc(challengeTable.createdAt), asc(challengePartsTable.sortOrder));
 
   // Group into ChallengeWithParts[]
-  const byChallenge = new Map<number, ChallengeWithParts>();
+  const byTeamChallenge = new Map<number, ChallengeWithParts>();
+  const partsSeen = new Map<number, Set<number>>();
 
   for (const r of rows) {
-    let c = byChallenge.get(r.challengeId);
+    let c = byTeamChallenge.get(r.teamChallengeId);
 
     if (!c) {
       c = {
+        teamChallengeId: r.teamChallengeId,
         challengeId: r.challengeId,
         name: r.challengeName,
         description: r.challengeDescription,
@@ -60,23 +65,30 @@ export async function getTeamChallengesForUser(userDbId: number): Promise<Challe
         groupName: r.groupName,
         startDate: r.startDate ?? null,
         endDate: r.endDate ?? null,
+        challengeIsActive: r.challengeIsActive ?? true,
+        teamChallengeIsActive: r.teamChallengeIsActive ?? true,
         parts: [],
       };
-      byChallenge.set(r.challengeId, c);
+      byTeamChallenge.set(r.teamChallengeId, c);
+      partsSeen.set(r.teamChallengeId, new Set());
     }
 
     if (r.partId) {
-      c.parts.push({
-        partId: r.partId,
-        partName: r.partName ?? "Unnamed Event",
-        metric: r.metric as any,
-        unit: r.unit ?? null,
-        targetValue: r.targetValue ?? null,
-        sortOrder: r.sortOrder ?? 1,
-        isTeamLogOnly: r.isTeamLogOnly ?? false,
-      });
+      const seen = partsSeen.get(r.teamChallengeId)!;
+      if (!seen.has(r.partId)) {
+        seen.add(r.partId);
+        c.parts.push({
+          partId: r.partId,
+          partName: r.partName ?? "Unnamed Event",
+          metric: r.metric as any,
+          unit: r.unit ?? null,
+          targetValue: r.targetValue ?? null,
+          sortOrder: r.sortOrder ?? 1,
+          isTeamLogOnly: r.isTeamLogOnly ?? false,
+        });
+      }
     }
   }
 
-  return Array.from(byChallenge.values());
+  return Array.from(byTeamChallenge.values());
 }
