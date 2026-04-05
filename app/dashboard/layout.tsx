@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import DashboardShell from "./layout-shell";
+import DashboardShell from "./dashboard-shell";
 
 export default async function DashboardLayout({
   children,

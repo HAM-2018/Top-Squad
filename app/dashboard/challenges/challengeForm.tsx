@@ -694,17 +694,17 @@ export default function ChallengeForm({
 
       <Card>
         <CardHeader className="pb-2 border-b border-rose-500">
-          <CardTitle className="flex items-center justify-between text-xl">
+          <CardTitle className="text-center text-2xl font-semibold">
             Your Challenges
             {challenges.length > 0 ? (
-              <span className="text-xs text-muted-foreground">
+              <div className="mt-1 text-center text-xs text-muted-foreground">
                 {challengeTab === "live" &&
                   `Showing ${Math.min(liveChallenges.length, 8)} of ${liveChallenges.length}`}
                 {challengeTab === "upcoming" &&
                   `Showing ${Math.min(upcomingChallenges.length, 8)} of ${upcomingChallenges.length}`}
                 {challengeTab === "completed" &&
                   `Showing ${Math.min(completedChallenges.length, 8)} of ${completedChallenges.length}`}
-              </span>
+              </div>
             ) : null}
           </CardTitle>
         </CardHeader>
